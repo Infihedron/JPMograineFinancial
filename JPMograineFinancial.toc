@@ -6,6 +6,7 @@
 ## X-Copyright: Copyright (C) 2026 Infihedron
 ## X-License: GPL-3.0-or-later
 ## X-Website: https://github.com/Infihedron/JPMograineFinancial
+## X-Curse-Project-ID: 1810780
 ## SavedVariables: JPMF_DB
 ## SavedVariablesPerCharacter: JPMF_CharDB
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02
