@@ -399,22 +399,22 @@ ns.RegisterPage("Accounts", function(page, f)
   end
   local more = UI.Text(f, 10.5, C.muted); more:SetPoint("TOPLEFT", 0, -74 - 6 * 46 - 2)
 
-  local presets = UI.Text(f, 11, C.muted); presets:SetPoint("BOTTOMLEFT", 0, 66); presets:SetText("OPEN AN ACCOUNT")
-  local px = 0
-  for _, p in ipairs(ns.PRESETS) do
-    local b = UI.Button(f, p.name, 110, 24, function()
+  local presets = UI.Text(f, 11, C.muted); presets:SetPoint("BOTTOMLEFT", 0, 96); presets:SetText("OPEN AN ACCOUNT")
+  for i, p in ipairs(ns.PRESETS) do
+    local b = UI.Button(f, p.name, 176, 24, function()
       local g = ns.AddAccount(p)
       if not p.auto and not p.target then Ask("JPMF_SET_TARGET", g.id) end
       if p.note then ns.Say(p.name .. ": " .. p.note) end
     end)
-    b:SetPoint("BOTTOMLEFT", px, 36)
-    px = px + 114
+    -- two rows of five
+    local col, row = (i - 1) % 5, floor((i - 1) / 5)
+    b:SetPoint("BOTTOMLEFT", col * 184, 66 - row * 30)
   end
   local cl = UI.Text(f, 11, C.muted); cl:SetPoint("BOTTOMLEFT", 0, 8); cl:SetText("CUSTOM")
   local nameBox = UI.EditBox(f, 260); nameBox:SetPoint("BOTTOMLEFT", 60, 2)
   local amtBox = UI.EditBox(f, 120); amtBox:SetPoint("LEFT", nameBox, "RIGHT", 8, 0)
   local hint = UI.Text(f, 10.5, C.muted); hint:SetPoint("LEFT", amtBox, "RIGHT", 140, 0)
-  hint:SetText("Name, then a target (e.g. 15g) or leave it empty for a plain savings account")
+  hint:SetWidth(320); hint:SetText("Target like 15g, or leave it empty for plain savings")
   local add = UI.Button(f, "Open account", 110, 24, function()
     local n, raw = nameBox:GetText(), amtBox:GetText()
     local v = raw:match("^%s*$") and 0 or ns.ParseMoney(raw)
@@ -718,10 +718,13 @@ local function StatementText()
   if #zones > 0 then
     add("")
     add("WHERE YOU EARNED")
-    for i = 1, math.min(5, #zones) do
-      local z = zones[i]
+    local shown = 0
+    for _, z in ipairs(zones) do
+      if shown >= 5 then break end
+      if z.p ~= 0 or z.n ~= 0 then shown = shown + 1
       add(("  %-22s %s%s"):format(z.zone, ns.Money(z.net),
         z.perHour and ("  (%s per hour over %.1f hours)"):format(ns.Money(z.perHour), z.secs / 3600) or ""))
+      end
     end
   end
   local saved, held, free = ns.Balances()
@@ -748,12 +751,26 @@ ns.StatementText = StatementText
 ns.RegisterPage("Statement", function(page, f)
   local head = UI.Heading(f, "Statement"); head:SetPoint("TOPLEFT", 0, 0)
   local paper = UI.Box(f, { 0.110, 0.094, 0.067 }, C.trim); paper:SetPoint("TOPLEFT", 0, -28); paper:SetSize(918, 420)
-  local text = UI.Text(paper, 12, { 0.902, 0.863, 0.761 }, UI.NUM)
-  text:SetPoint("TOPLEFT", 18, -16); text:SetWidth(880); text:SetJustifyV("TOP")
+  -- the statement scrolls inside the paper (mouse wheel, or the bar when the game provides one)
+  local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, paper, "UIPanelScrollFrameTemplate")
+  if not ok or not scroll then scroll = CreateFrame("ScrollFrame", nil, paper) end
+  scroll:SetPoint("TOPLEFT", 18, -14); scroll:SetPoint("BOTTOMRIGHT", -34, 12)
+  local body = CreateFrame("Frame", nil, scroll); body:SetSize(860, 400)
+  scroll:SetScrollChild(body)
+  scroll:EnableMouseWheel(true)
+  scroll:SetScript("OnMouseWheel", function(self, delta)
+    local maxV = math.max(0, body:GetHeight() - self:GetHeight())
+    self:SetVerticalScroll(math.max(0, math.min(maxV, self:GetVerticalScroll() - delta * 40)))
+  end)
+  local text = UI.Text(body, 12, { 0.902, 0.863, 0.761 }, UI.NUM)
+  text:SetPoint("TOPLEFT", 0, 0); text:SetWidth(860); text:SetJustifyV("TOP")
   UI.Button(f, "Planning session", 150, 26, function() ns.OpenPlanning(true) end):SetPoint("TOPLEFT", paper, "BOTTOMLEFT", 0, -10)
   UI.Button(f, "Copy statement", 140, 26, function() ns.ShowCopy("Weekly statement", StatementText()) end)
     :SetPoint("TOPLEFT", paper, "BOTTOMLEFT", 160, -10)
-  function page:Refresh() text:SetText(StatementText()) end
+  function page:Refresh()
+    text:SetText(StatementText())
+    body:SetHeight((text:GetStringHeight() or 400) + 20)
+  end
 end)
 
 ---------------------------------------------------------------------------
@@ -773,8 +790,10 @@ ns.RegisterPage("Settings", function(page, f)
       function(v) s().overdraft = v and "pull" or "hold"; ns.Fire("JPMF_GOALS_CHANGED") end },
     { "Debug log (for bug reports)", function() return s().debug end, function(v) s().debug = v end },
   }
+  -- two columns of three, so the cards below have room
   for i, c in ipairs(checks) do
-    UI.Check(f, c[1], c[2], c[3]):SetPoint("TOPLEFT", 0, -28 - (i - 1) * 28)
+    local col, row = floor((i - 1) / 3), (i - 1) % 3
+    UI.Check(f, c[1], c[2], c[3]):SetPoint("TOPLEFT", col * 460, -30 - row * 30)
   end
 
   local data = Card(f, 450, 300, "Your data"); data:SetPoint("TOPLEFT", 0, -150)

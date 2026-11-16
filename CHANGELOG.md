@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1 (2026-11-16)
+
+- Settings: the options are in two columns, so they no longer run into the Your data panel.
+- Statement: the statement scrolls inside its panel instead of running over the buttons.
+- Accounts: the preset buttons are in two rows, so every preset fits.
+- Zones with no gold earned or spent are left out of the statement and the zone view.
+
 ## 1.1.0 (2026-11-16)
 
 **Accounts**

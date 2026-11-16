@@ -13,7 +13,7 @@
      Core: saved data, events, error capture, debug log, slash commands, diagnostics. ]]
 
 local ADDON, ns = ...
-ns.VERSION = "1.1.0"
+ns.VERSION = "1.1.1"
 ns.SCHEMA = 2
 ns.NAME = "JP Mograine Financial"
 ns.GOLD_HEX = "e9c86a"
