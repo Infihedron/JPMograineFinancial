@@ -569,8 +569,8 @@ ns.RegisterPage("Ledger", function(page, f)
       cats.title:SetText("BY ZONE")
       local days = page.period == nil and 400 or page.period == -1 and 0 or page.period
       for _, z in ipairs(ns.ZoneReport(days)) do
-        rows[#rows + 1] = { cat = z.zone, v = z.net,
-          note = z.perHour and (" \194\183 " .. ns.Money(z.perHour) .. "/h") or "" }
+        if z.p ~= 0 or z.n ~= 0 then rows[#rows + 1] = { cat = z.zone, v = z.net,
+          note = z.perHour and (" \194\183 " .. ns.Money(z.perHour) .. "/h") or "" } end
         biggest = max(biggest, abs(z.net))
       end
     else
