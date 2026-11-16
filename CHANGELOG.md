@@ -19,6 +19,9 @@
 **Presets**
 - Updated to WoW: Forever launch prices: Riding at 40 is 100g (first mount included), Riding at 60 is 1,000g, and a new Dual spec at 40 preset at 50g.
 
+**License**
+- JP Mograine Financial is now free software under the GNU GPL v3. The names and branding stay with Infihedron; see NOTICE.md.
+
 ## 1.0.7 (2026-11-16)
 
 - Pet trainers are recognized as their own kind of trainer. Their skills (Great Stamina, Natural Armor, resistances, Growl) are planned separately, and spending there is recorded as Pet training.
