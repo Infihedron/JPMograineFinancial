@@ -1,5 +1,10 @@
 package-as: JPMograineFinancial
 
+# Ship our own CHANGELOG.md instead of one generated from commit messages
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 ignore:
   - "*.zip"
   - tests
