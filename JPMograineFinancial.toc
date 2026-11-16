@@ -1,0 +1,22 @@
+## Interface: 16001
+## Title: |cffe9c86aJP Mograine Financial|r
+## Notes: Private banking for adventurers: savings accounts, gold forecasts and a weekly review from your advisor, Morgrim Stanley.
+## Author: Infihedron
+## Version: 1.1.0
+## X-Copyright: Copyright (C) 2026 Infihedron
+## X-License: GPL-3.0-or-later
+## X-Website: https://github.com/Infihedron/JPMograineFinancial
+## SavedVariables: JPMF_DB
+## SavedVariablesPerCharacter: JPMF_CharDB
+## IconTexture: Interface\Icons\INV_Misc_Coin_02
+## AddonCompartmentFunc: JPMF_OnCompartmentClick
+## AddonCompartmentFuncOnEnter: JPMF_OnCompartmentEnter
+## AddonCompartmentFuncOnLeave: JPMF_OnCompartmentLeave
+
+Core.lua
+Ledger.lua
+Planner.lua
+Market.lua
+UI.lua
+Pages.lua
+Morgrim.lua
