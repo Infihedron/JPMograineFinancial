@@ -21,7 +21,7 @@ ns.PRESETS = {
   { kind = "training",   name = "Training reserve",    auto = true,
     note = "Fills itself from your class trainer's prices for your next six levels." },
   { kind = "stable",     name = "Stable slot",         target = 5 * G,
-    note = "The extra hunter stable slot. Classic price; confirm it at your stable master." },
+    note = "The extra hunter stable slot: 5g in WoW: Forever, with no reputation discount." },
   { kind = "profession", name = "Profession training", target = nil,
     note = "Expert or Artisan training. Enter the trainer's price." },
   { kind = "bag",        name = "Bag upgrade",         target = nil,
