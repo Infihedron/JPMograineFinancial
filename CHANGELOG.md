@@ -5,6 +5,8 @@
 - Account arrival estimates no longer count the training reserve twice. The forecast already spends it on training.
 - An account only shows as filling once your gold stays above it through every planned training cost ahead, not just today.
 - Accounts without an estimate now say why: "Needs play data", "Short at Lv 40" when planned training uses up your gold, "Not at this pace" or "15+ levels away".
+- Your earning pace no longer counts auction house purchases (one-off upgrades, not a running cost), and is never below zero. A single gear buy early on no longer makes the forecast assume you lose gold every hour.
+- Morgrim's shortfall warning now spells out the parts: what you should have at that level, what is due there (training, your mount), and the gap, which can never be more than those costs.
 - The stable slot preset is confirmed at 5g in WoW: Forever, with no reputation discount.
 
 ## 1.1.1 (2026-11-16)

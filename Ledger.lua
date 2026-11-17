@@ -3,7 +3,7 @@
      keeps daily and monthly books, and fades old detail into summaries. ]]
 
 local _, ns = ...
-local floor = math.floor
+local floor, max = math.floor, math.max
 
 ns.CATEGORIES = {
   "Quests", "Loot", "Vendor sales", "Auction house", "Mail", "Trade",
@@ -309,8 +309,11 @@ function ns.SumAll()
   return byCat, inc, out, ns.char.played or 0
 end
 
--- Net gold per hour played over the last two weeks, leaving out training
--- (the forecast plans training separately) and unreconciled adjustments.
+-- Net gold per hour played over the last two weeks: your earning pace.
+-- Left out: training (the forecast plans it separately), adjustments, transfers
+-- between your characters, and auction house purchases (one-off upgrades, not a
+-- running cost). A pace below zero is treated as zero: the forecast plans your
+-- known costs and does not assume you keep losing gold.
 function ns.GoldPerHour()
   local o = ns.acct.settings.rateOverride
   if o then return o, true end
@@ -320,10 +323,10 @@ function ns.GoldPerHour()
   for cat, e in pairs(byCat) do
     if cat ~= "Class training" and cat ~= "Pet training" and cat ~= "Profession training"
       and cat ~= "Unreconciled" and cat ~= "Transfers" then
-      net = net + e[1] + e[2]
+      net = net + e[1] + (cat == "Auction house" and 0 or e[2])
     end
   end
-  return net / (played / 3600), false
+  return max(0, net / (played / 3600)), false
 end
 
 -- Average hours per level from the last few levels this addon saw.

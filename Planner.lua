@@ -660,11 +660,19 @@ function ns.MorgrimLines()
   elseif not ns.char.debits.scannedAt then
     lines[#lines + 1] = "Visit your class trainer once, so I can see what your next levels will cost."
   end
-  local worst, worstLevel = 0, nil
-  for _, p in ipairs(pts) do if p.after < worst then worst, worstLevel = p.after, p.level end end
-  if worstLevel then
-    lines[#lines + 1] = ("A word of caution: at your current pace you will be about %s short at level %d. Earn a little more, spend a little less, or adjust an account."):format(
-      ns.Money(-worst), worstLevel)
+  -- the first level where the plan runs out of gold, explained in its parts
+  local short
+  for _, p in ipairs(pts) do if p.after < 0 then short = p; break end end
+  if short then
+    local what = {}
+    for _, g in ipairs(ns.char.goals) do
+      if g.spend and g.level == short.level then what[#what + 1] = g.name end
+    end
+    local train = short.debit - (short.spend or 0)
+    if train > 0 then table.insert(what, 1, "training") end
+    lines[#lines + 1] = ("A word of caution: at level %d you should have about %s, and %s there will cost %s. That leaves you about %s short. Earn a little more, spend a little less, or adjust an account."):format(
+      short.level, ns.Money(math.max(0, short.peak)), #what > 0 and table.concat(what, " and ") or "your plans",
+      ns.Money(short.debit), ns.Money(math.min(-short.after, short.debit)))
   end
   local gph = ns.GoldPerHour()
   if gph and gph < 0 then
