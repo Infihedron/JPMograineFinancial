@@ -1,5 +1,5 @@
 # Build the addon zip and publish it whenever a version tag (like v1.1.0) is pushed.
-# Uploads to CurseForge (and Wago) once their keys are added as repository secrets
+# Uploads to CurseForge (and Wago) when their keys are set as repository secrets
 # and the TOC has ## X-Curse-Project-ID / ## X-Wago-ID lines.
 name: Release
 
@@ -15,7 +15,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      # the repository secret is still named CF_API_KEY; CF_API_TOKEN is the name the packager documents
+      CF_API_TOKEN: ${{ secrets.CF_API_KEY }}
       WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -23,3 +24,7 @@ jobs:
         with:
           fetch-depth: 0
       - uses: BigWigsMods/packager@v2
+        with:
+          # zip name : label shown on CurseForge (the tag supplies the version, e.g. v1.2.1).
+          # Labels cannot contain spaces; CurseForge shows the project name beside it anyway.
+          args: -n "{package-name}-{project-version}:{project-version}"
