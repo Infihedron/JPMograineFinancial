@@ -8,6 +8,7 @@
 - Your earning pace no longer counts auction house purchases (one-off upgrades, not a running cost), and is never below zero. A single gear buy early on no longer makes the forecast assume you lose gold every hour.
 - Morgrim's shortfall warning now spells out the parts: what you should have at that level, what is due there (training, your mount), and the gap, which can never be more than those costs.
 - The stable slot preset is confirmed at 5g in WoW: Forever, with no reputation discount.
+- Morgrim Stanley has his proper look: a distinguished dwarf of the Ironforge Hall of Explorers. If you had chosen your own portrait with `/jpm morgrim target`, it is kept.
 
 ## 1.1.1 (2026-11-16)
 

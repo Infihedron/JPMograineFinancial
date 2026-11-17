@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 ns.VERSION = "1.1.2"
-ns.SCHEMA = 2
+ns.SCHEMA = 3
 ns.NAME = "JP Mograine Financial"
 ns.GOLD_HEX = "e9c86a"
 
@@ -79,7 +79,7 @@ end
 local ACCOUNT_DEFAULTS = {
   settings = {
     rawDays = 14, debug = false, autoPlan = true, includeProfTraining = false, includePetTraining = true, overdraft = "hold",
-    minimap = { angle = 215, hide = false }, morgrimCreature = 2455,
+    minimap = { angle = 215, hide = false }, morgrimCreature = 8256,   -- Curator Thorius, Ironforge
     rateOverride = nil, hplOverride = nil,
   },
   wishlist = {}, household = {}, log = {}, errors = {}, uncat = {},
@@ -105,6 +105,10 @@ local MIGRATIONS = {
   -- 2: versions before 1.0.7 filed pet trainer prices as class training; rescan
   [2] = function(db)
     if db.debits then db.debits.class = {}; db.debits.scannedAt = nil end
+  end,
+  -- 3: Morgrim's default portrait is now Curator Thorius; keep any portrait the player chose
+  [3] = function(db)
+    if db.settings and db.settings.morgrimCreature == 2455 then db.settings.morgrimCreature = 8256 end
   end,
 }
 
