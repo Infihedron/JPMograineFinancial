@@ -1,5 +1,5 @@
 local ns = {}
-local files = {"Core","Ledger","Planner","Market","UI","Pages","Morgrim"}
+local files = {"Core","Ledger","Planner","Market","Assets","UI","Pages","Morgrim","Broker"}
 for _, f in ipairs(files) do
   local chunk = assert(loadfile(DIR .. f .. ".lua"))
   chunk("JPMograineFinancial", ns)

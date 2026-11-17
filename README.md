@@ -14,13 +14,17 @@ Built for **World of Warcraft: Forever**.
 - **Deposits, withdrawals and standing orders.** Move gold between Free and any account yourself, or set an auto-deposit rule such as "20% of everything I earn goes to the Mount Fund". Rules stop when an account is full.
 - **Overdraft protection, your way.** Spending always comes out of Free first. If you spend more than Free holds, you are shown as overdrawn until you withdraw from an account, or, if you prefer, the addon covers it from your lowest-priority accounts automatically.
 - **Training reserve that pays your trainer.** The training account fills from what your next six levels of training will cost, and training bought at a trainer is paid from it.
-- **Forecast.** Your projected gold level by level, based on what you actually earn per hour played. Training and account purchases (like your mount) step the line down at the level they happen.
+- **Gold per level.** What you earn, what leveling costs you (repairs, ammo, food, flights) and what is left, for every level you play. Income grows as you level, so the forecast follows your own rising curve instead of assuming you earn the same at 40 as at 30. Gold farmers can switch the forecast to gold per hour instead.
+- **Forecast.** Your projected gold level by level. Training and account purchases (like your mount) step the line down at the level they happen.
 - **Trainer scan.** Open your class trainer once and the addon records what your next levels will cost, at your real price after reputation discounts. Skills from talents you do not have are left out. Hunters: pet trainer skills are planned separately.
 - **Ledger.** Every gold change, sorted into categories: quests, loot, vendor sales, the auction house, mail, trades, class, pet and profession training, flights, repairs, the stable, and vendor purchases split into ammo, food and drink, crafting materials and reagents. Gold mailed between your own characters is a transfer, not income or spending.
 - **Earnings by zone.** See where your gold actually comes from, and what each zone pays per hour played.
 - **Wishlist and price watch.** Add items you want with a target price. Prices are recorded whenever you open a vendor or browse the auction house, item tooltips show the last price seen, and you are alerted when an item drops below your target.
 - **Weekly statement and planning session.** Morgrim Stanley walks you through last week's earnings and spending, your biggest expense, your goals and what is coming up, with one piece of advice.
+- **Assets.** What your bags and bank would sell for, plus auction value for wishlist items you have priced. Shown on its own: your net worth stays the gold you actually have.
 - **Household.** Every character's gold in one place, updated when you log into each.
+- **Export.** Copy your ledger, daily totals and per-level books as spreadsheet text.
+- **Status bars.** If you use Titan Panel, ChocolateBar or a similar bar, JP Mograine Financial shows your gold, Free and gold per level there.
 
 ## Install
 
@@ -33,7 +37,7 @@ Built for **World of Warcraft: Forever**.
 1. Type `/jpm` or click the gold coin on your minimap.
 2. Open **Accounts** and open **Riding at 40**. Use **Deposit** to set aside what you already have, and **Auto %** to keep it growing.
 3. Visit your **class trainer**. Nothing to click: the addon reads upcoming costs on its own.
-4. Play for half an hour. The forecast needs a little play time to learn your gold per hour.
+4. Play for half an hour. Until you finish two levels, the forecast uses your gold per hour; after that it switches to your own gold per level.
 5. Right-click the minimap coin for your first planning session.
 
 ## Commands
@@ -62,7 +66,9 @@ Type `/jpm report`, copy the text, and include it with your report along with wh
 
 ## FAQ
 
-**Why does the forecast say it needs more data?** It projects from your real gold per hour played. Give it about 30 minutes of play, or set an override on the Forecast tab.
+**Why does the forecast say it needs more data?** It projects from what you really earn. Gold per level needs two finished levels; until then it uses gold per hour, which needs about 30 minutes of play. You can also set an override on the Forecast tab.
+
+**Why are my items not part of my net worth?** Items are only worth something once sold, and what they fetch varies. Net worth stays your actual gold; items are listed separately as Assets.
 
 **Why are some prices missing?** The addon only sees prices when you look: at a vendor's window or in auction house search results. It never searches the auction house by itself.
 

@@ -1,6 +1,6 @@
 local G = 10000
 local ns = {}
-for _, f in ipairs({"Core","Ledger","Planner","Market","UI","Pages","Morgrim"}) do assert(loadfile(DIR .. f .. ".lua"))("JPMograineFinancial", ns) end
+for _, f in ipairs({"Core","Ledger","Planner","Market","Assets","UI","Pages","Morgrim","Broker"}) do assert(loadfile(DIR .. f .. ".lua"))("JPMograineFinancial", ns) end
 local function FIRE(ev, ...) ns.Fire(ev, ...) end
 local function money(d) MONEY = MONEY + d; FIRE("PLAYER_MONEY") end
 local function last() return JPMF_CharDB.raw[#JPMF_CharDB.raw].c end

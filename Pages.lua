@@ -158,20 +158,22 @@ ns.DrawForecast = DrawForecast
 -- Dashboard
 ---------------------------------------------------------------------------
 ns.RegisterPage("Dashboard", function(page, f)
-  local gold = Card(f, 230, 96, "Net worth"); gold:SetPoint("TOPLEFT", 0, 0)
+  local gold = Card(f, 230, 112, "Net worth"); gold:SetPoint("TOPLEFT", 0, 0)
   gold.value = UI.Text(gold, 22, { 0.953, 0.863, 0.561 }, UI.NUM); gold.value:SetPoint("TOPLEFT", 12, -28)
   gold.seg = UI.SegBar(gold, 206, 8); gold.seg:SetPoint("TOPLEFT", gold, "TOPLEFT", 12, -58)
   gold.sub = UI.Text(gold, 11, C.muted); gold.sub:SetPoint("TOPLEFT", 12, -72); gold.sub:SetWidth(206)
+  -- items are shown apart from net worth, which stays the gold you actually have
+  gold.assets = UI.Text(gold, 10.5, C.muted); gold.assets:SetPoint("TOPLEFT", 12, -90); gold.assets:SetWidth(206)
 
   local net = Card(f, 230, 80, "Net, last 7 days"); net:SetPoint("TOPLEFT", gold, "BOTTOMLEFT", 0, -10)
   net.value = UI.Text(net, 20, C.green, UI.NUM); net.value:SetPoint("TOPLEFT", 12, -28)
   net.sub = UI.Text(net, 11, C.muted); net.sub:SetPoint("TOPLEFT", 12, -56)
 
-  local rate = Card(f, 230, 80, "Gold per hour played"); rate:SetPoint("TOPLEFT", net, "BOTTOMLEFT", 0, -10)
+  local rate = Card(f, 230, 80, "Your pace"); rate:SetPoint("TOPLEFT", net, "BOTTOMLEFT", 0, -10)
   rate.value = UI.Text(rate, 20, C.text, UI.NUM); rate.value:SetPoint("TOPLEFT", 12, -28)
   rate.sub = UI.Text(rate, 11, C.muted); rate.sub:SetPoint("TOPLEFT", 12, -56)
 
-  local deb = Card(f, 230, 190, "Upcoming costs"); deb:SetPoint("TOPLEFT", rate, "BOTTOMLEFT", 0, -10)
+  local deb = Card(f, 230, 174, "Upcoming costs"); deb:SetPoint("TOPLEFT", rate, "BOTTOMLEFT", 0, -10)
   deb.pool = TextPool(deb)
 
   local fc = Card(f, 430, 270, "Forecast"); fc:SetPoint("TOPLEFT", 242, 0)
@@ -228,9 +230,19 @@ ns.RegisterPage("Dashboard", function(page, f)
     net.value:SetTextColor(c[1], c[2], c[3])
     net.sub:SetText(("Earned %s \194\183 spent %s"):format(ns.Money(st.income), ns.Money(-st.spend)))
 
+    local vendor = ns.Assets()
+    gold.assets:SetText(("Assets: %s in items (separate)"):format(ns.Money(vendor)))
     local gph, overridden = ns.GoldPerHour()
-    rate.value:SetText(gph and ns.Money(gph) or "--")
-    rate.sub:SetText(overridden and "Your override" or gph and "Last 14 days, training excluded" or "Gathering data")
+    local fNet, _, info = ns.PerLevelPace()
+    if fNet and ns.acct.settings.pace ~= "hour" and not overridden then
+      local cur = UnitLevel("player")
+      rate.value:SetText(ns.Money(fNet(cur)) .. " / level")
+      rate.sub:SetText(("About %s by level %d (from %d levels)"):format(ns.Money(fNet(min(cur + 5, 60))), min(cur + 5, 60), info.levels))
+    else
+      rate.value:SetText(gph and (ns.Money(gph) .. " / hour") or "--")
+      rate.sub:SetText(overridden and "Your override" or gph and "Last 14 days, training excluded"
+        or "Gathering data: finish two levels for gold per level")
+    end
 
     deb.pool:Reset()
     local d, cur, y = ns.Debits(), UnitLevel("player"), -30
@@ -333,8 +345,8 @@ ns.RegisterPage("Accounts", function(page, f)
 
   -- summary strip: net worth, the split, and Free
   local sum = Card(f, 918, 40); sum:SetPoint("TOPLEFT", 0, -26)
-  sum.text = UI.Text(sum, 12, C.text, UI.NUM); sum.text:SetPoint("LEFT", 12, 0); sum.text:SetWidth(520)
-  sum.seg = UI.SegBar(sum, 360, 12); sum.seg:SetPoint("RIGHT", sum, "RIGHT", -12, 0)
+  sum.text = UI.Text(sum, 12, C.text, UI.NUM); sum.text:SetPoint("LEFT", 12, 0); sum.text:SetWidth(640)
+  sum.seg = UI.SegBar(sum, 240, 12); sum.seg:SetPoint("RIGHT", sum, "RIGHT", -12, 0)
 
   local function Selected() return ns.FindAccount(page.pick) end
   Popup("JPMF_SET_TARGET", "Target for this account (for example 90g or 12g 50s). Leave empty for no target:", function(id, text)
@@ -427,9 +439,10 @@ ns.RegisterPage("Accounts", function(page, f)
   function page:Refresh()
     local segs, held, free = UI.WorthSegments()
     sum.seg:Set(segs)
-    sum.text:SetText(("Net worth %s   \194\183   In accounts %s   \194\183   %s"):format(
+    sum.text:SetText(("Net worth %s   \194\183   In accounts %s   \194\183   %s   \194\183   Assets %s"):format(
       ns.Money(GetMoney(), true), ns.Money(held, true),
-      free < 0 and ("|cfff08b80Overdrawn %s|r"):format(ns.Money(-free)) or ("Free %s"):format(ns.Money(free, true))))
+      free < 0 and ("|cfff08b80Overdrawn %s|r"):format(ns.Money(-free)) or ("Free %s"):format(ns.Money(free, true)),
+      ns.Money((ns.Assets()), true)))
     local saved = ns.Balances()
     local pts = ns.Forecast(15)
     local list = ns.char.goals
@@ -474,7 +487,13 @@ ns.RegisterPage("Forecast", function(page, f)
   local lines, texts = UI.LinePool(chart), TextPool(chart)
 
   local a = Card(f, 450, 140, "Assumptions"); a:SetPoint("TOPLEFT", box, "BOTTOMLEFT", 0, -10)
-  a.rate = UI.Text(a, 12, C.text); a.rate:SetPoint("TOPLEFT", 12, -30)
+  -- pace: by level (your own rising curve) or by hour
+  local byLevel, byHour
+  byLevel = UI.Button(a, "By level", 76, 20, function() ns.acct.settings.pace = "level"; ns.Fire("JPMF_GOALS_CHANGED"); page:Refresh() end)
+  byLevel:SetPoint("TOPRIGHT", -88, -6)
+  byHour = UI.Button(a, "By hour", 76, 20, function() ns.acct.settings.pace = "hour"; ns.Fire("JPMF_GOALS_CHANGED"); page:Refresh() end)
+  byHour:SetPoint("TOPRIGHT", -8, -6)
+  a.rate = UI.Text(a, 12, C.text); a.rate:SetPoint("TOPLEFT", 12, -30); a.rate:SetWidth(426)
   local rateBox = UI.EditBox(a, 90); rateBox:SetPoint("TOPLEFT", 12, -52)
   UI.Button(a, "Override", 76, 24, function()
     ns.acct.settings.rateOverride = ns.ParseMoney(rateBox:GetText()); rateBox:SetText(""); page:Refresh()
@@ -496,7 +515,18 @@ ns.RegisterPage("Forecast", function(page, f)
     local pts, gph, hpl = DrawForecast(chart, lines, texts, 906, 318, 12, false)
     local g, go = ns.GoldPerHour()
     local h, ho = ns.HoursPerLevel()
-    a.rate:SetText(("Gold per hour: %s%s"):format(g and ns.Money(g) or "not enough data", go and " (your override)" or ""))
+    local fNet, _, info = ns.PerLevelPace()
+    local levelMode = ns.acct.settings.pace ~= "hour"
+    byLevel:SetSelected(levelMode); byHour:SetSelected(not levelMode)
+    if levelMode and fNet and not go then
+      local cur = UnitLevel("player")
+      a.rate:SetText(("By level: about %s at %d, rising to %s at %d (from your last %d levels). Hourly figures below are for reference."):format(
+        ns.Money(fNet(cur)), cur, ns.Money(fNet(min(cur + 6, 60))), min(cur + 6, 60), info.levels))
+    elseif levelMode and not go then
+      a.rate:SetText(("By level needs two finished levels; until then, by hour: %s."):format(g and ns.Money(g) or "not enough data"))
+    else
+      a.rate:SetText(("Gold per hour: %s%s"):format(g and ns.Money(g) or "not enough data", go and " (your override, so pacing by hour)" or ""))
+    end
     a.hpl:SetText(("Hours per level: %.1f%s"):format(h, ho and " (your override)" or ""))
     d.pool:Reset()
     local y = -28
@@ -536,6 +566,13 @@ ns.RegisterPage("Ledger", function(page, f)
     page:Refresh()
   end)
   viewBtn:SetPoint("TOPLEFT", 120 + #periods * 86 + 20, 2)
+  local levelBtn = UI.Button(f, "By level", 90, 24, function()
+    page.view = page.view == "level" and "category" or "level"
+    page:Refresh()
+  end)
+  levelBtn:SetPoint("LEFT", viewBtn, "RIGHT", 4, 0)
+  local exportBtn = UI.Button(f, "Export CSV", 96, 24, function() ns.ShowCopy("Ledger export (CSV)", ns.ExportCSV()) end)
+  exportBtn:SetPoint("LEFT", levelBtn, "RIGHT", 4, 0)
   local cats = Card(f, 450, 440, "By category"); cats:SetPoint("TOPLEFT", 0, -34)
   cats.rows = {}
   for i = 1, 16 do
@@ -565,7 +602,17 @@ ns.RegisterPage("Ledger", function(page, f)
     end
     local rows, biggest = {}, 1
     viewBtn:SetSelected(page.view == "zone")
-    if page.view == "zone" then
+    levelBtn:SetSelected(page.view == "level")
+    if page.view == "level" then
+      cats.title:SetText("BY LEVEL (AFTER RUNNING COSTS)")
+      local lr, cur = ns.LevelRows(), UnitLevel("player")
+      for i = #lr, 1, -1 do
+        local r = lr[i]
+        rows[#rows + 1] = { cat = ("Level %d%s"):format(r.level, r.level == cur and " (now)" or ""), v = r.net,
+          note = (" \194\183 %.1fh"):format(r.secs / 3600) }
+        biggest = max(biggest, abs(r.net))
+      end
+    elseif page.view == "zone" then
       cats.title:SetText("BY ZONE")
       local days = page.period == nil and 400 or page.period == -1 and 0 or page.period
       for _, z in ipairs(ns.ZoneReport(days)) do
@@ -739,6 +786,19 @@ local function StatementText()
   add(("  %-22s %s"):format(free < 0 and "Overdrawn" or "Free to spend", ns.Money(free)))
   local auto = ns.AutoDeposits(st.days)
   if auto > 0 then add(("  Auto-deposited this week: %s"):format(ns.Money(auto))) end
+  add("  " .. ns.AssetsLine() .. " (not counted in net worth)")
+  local lr, shownL = ns.LevelRows(), 0
+  if #lr > 0 then
+    add("")
+    add("BY LEVEL (earned / running costs / net / hours)")
+    for i = #lr, 1, -1 do
+      if shownL >= 5 then break end
+      local r = lr[i]
+      add(("  Level %-3d %s  /  %s  /  %s  /  %.1fh%s"):format(r.level, ns.Money(r.income), ns.Money(r.costs),
+        ns.Money(r.net), r.secs / 3600, r.level == UnitLevel("player") and "  (in progress)" or ""))
+      shownL = shownL + 1
+    end
+  end
   add("")
   add("FROM YOUR ADVISOR")
   for _, l in ipairs(ns.MorgrimLines()) do add("  " .. l) end

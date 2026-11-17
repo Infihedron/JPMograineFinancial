@@ -160,6 +160,15 @@ function ns.Record(amount, cat, note)
   c.raw[#c.raw + 1] = { t = t, a = amount, c = cat, z = GetRealZoneText and GetRealZoneText() or "" }
   Bump(c.daily, DayKey(t), cat, amount)
   Bump(c.monthly, MonthKey(t), cat, amount)
+  -- by character level: what you earned and spent while at this level
+  if cat ~= "Unreconciled" and cat ~= "Transfers" then
+    local L = UnitLevel("player") or 0
+    local lb = c.levelBook[L]
+    if not lb then lb = { secs = 0, cats = {} }; c.levelBook[L] = lb end
+    local e = lb.cats[cat]
+    if not e then e = { 0, 0 }; lb.cats[cat] = e end
+    if amount >= 0 then e[1] = e[1] + amount else e[2] = e[2] + amount end
+  end
   -- by zone (not adjustments or transfers, which are not earned anywhere)
   if cat ~= "Unreconciled" and cat ~= "Transfers" then
     local day = c.daily[DayKey(t)]
@@ -244,6 +253,9 @@ local function Tick()
   local day = DayKey(now)
   c.daily[day] = c.daily[day] or {}
   c.daily[day]._played = (c.daily[day]._played or 0) + d
+  local L = UnitLevel("player") or 0
+  c.levelBook[L] = c.levelBook[L] or { secs = 0, cats = {} }
+  c.levelBook[L].secs = c.levelBook[L].secs + d
   local zone = GetRealZoneText and GetRealZoneText() or ""
   if zone == "" then zone = "Unknown" end
   c.daily[day]._zt = c.daily[day]._zt or {}
@@ -372,3 +384,116 @@ function ns.ZoneReport(days)
   table.sort(list, function(a, b) return a.net > b.net end)
   return list
 end
+
+---------------------------------------------------------------------------
+-- Gold per level
+---------------------------------------------------------------------------
+-- Costs that come with leveling and keep coming. Training is planned separately;
+-- auction house buys and stable slots are one-off choices, so they are left out.
+ns.RUNNING_COSTS = { Repairs = true, Ammo = true, ["Food & drink"] = true, Flights = true,
+  ["Vendor purchases"] = true, Reagents = true, ["Crafting materials"] = true, Mail = true,
+  Bank = true, Other = true }
+
+-- One row per character level: income, running costs, net, other spending, hours.
+-- A level is complete once you have passed it and spent at least ten minutes in it.
+function ns.LevelRows()
+  local cur, rows = UnitLevel("player"), {}
+  for L, e in pairs(ns.char.levelBook or {}) do
+    local inc, run, other = 0, 0, 0
+    for cat, v in pairs(e.cats or {}) do
+      inc = inc + v[1]
+      if ns.RUNNING_COSTS[cat] then run = run + v[2] else other = other + v[2] end
+    end
+    rows[#rows + 1] = { level = L, income = inc, costs = run, other = other, net = inc + run,
+                        secs = e.secs or 0, complete = L < cur and (e.secs or 0) >= 600 }
+  end
+  table.sort(rows, function(a, b) return a.level < b.level end)
+  return rows
+end
+
+-- Fit your net gold per level against level, so the forecast expects income to
+-- rise as you level. Uses your last eight complete levels; needs at least two.
+-- Returns fNet(level), fIncome(level) and a note, or nil.
+function ns.PerLevelPace()
+  local pts = {}
+  for _, r in ipairs(ns.LevelRows()) do
+    if r.complete then pts[#pts + 1] = r end
+  end
+  if #pts < 2 then return nil end
+  while #pts > 8 do table.remove(pts, 1) end
+  local function Fit(key)
+    local n, sx, sy, sxx, sxy = #pts, 0, 0, 0, 0
+    for _, r in ipairs(pts) do
+      sx, sy = sx + r.level, sy + r[key]
+      sxx, sxy = sxx + r.level * r.level, sxy + r.level * r[key]
+    end
+    -- with four or more levels, a straight line; with fewer, proportional to level
+    if n >= 4 and n * sxx - sx * sx > 0 then
+      local b = (n * sxy - sx * sy) / (n * sxx - sx * sx)
+      if b >= 0 then
+        local a = (sy - b * sx) / n
+        return function(L) return max(0, a + b * L) end, "line"
+      end
+    end
+    local k = sx > 0 and sy / sx or 0
+    return function(L) return max(0, k * L) end, "ratio"
+  end
+  local fNet, how = Fit("net")
+  local fInc = Fit("income")
+  return fNet, fInc, { levels = #pts, how = how }
+end
+
+-- Is there any pace to forecast with (per level or per hour)?
+function ns.HasPace()
+  if ns.acct.settings.pace ~= "hour" and not ns.acct.settings.rateOverride and ns.PerLevelPace() then return true end
+  return ns.GoldPerHour() ~= nil
+end
+
+---------------------------------------------------------------------------
+-- Export: the ledger as spreadsheet text (copied from the copy window)
+---------------------------------------------------------------------------
+local function Q(v)
+  v = tostring(v == nil and "" or v)
+  if v:find('[,"\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
+  return v
+end
+local function Row(...)
+  local out = {}
+  for i = 1, select("#", ...) do out[i] = Q((select(i, ...))) end
+  return table.concat(out, ",")
+end
+
+function ns.ExportCSV()
+  local c, out = ns.char, {}
+  out[#out + 1] = "# JP Mograine Financial export, " .. ns.CharKey() .. ", " .. date("%Y-%m-%d %H:%M")
+  out[#out + 1] = "# Amounts in copper (10000 copper = 1 gold). Spending is negative."
+  out[#out + 1] = ""
+  out[#out + 1] = "# Transactions (the last " .. (ns.acct.settings.rawDays or 14) .. " days)"
+  out[#out + 1] = Row("date", "time", "category", "copper", "amount", "zone")
+  for _, e in ipairs(c.raw) do
+    out[#out + 1] = Row(date("%Y-%m-%d", e.t), date("%H:%M:%S", e.t), e.c, e.a, ns.Money(e.a), e.z or "")
+  end
+  out[#out + 1] = ""
+  out[#out + 1] = "# Daily totals"
+  out[#out + 1] = Row("date", "category", "earned_copper", "spent_copper")
+  local days = {}
+  for k in pairs(c.daily) do days[#days + 1] = k end
+  table.sort(days)
+  for _, k in ipairs(days) do
+    local cats = {}
+    for cat in pairs(c.daily[k]) do if cat:sub(1, 1) ~= "_" then cats[#cats + 1] = cat end end
+    table.sort(cats)
+    for _, cat in ipairs(cats) do
+      local e = c.daily[k][cat]
+      out[#out + 1] = Row(k, cat, e[1], e[2])
+    end
+  end
+  out[#out + 1] = ""
+  out[#out + 1] = "# By character level"
+  out[#out + 1] = Row("level", "earned_copper", "running_costs_copper", "other_spending_copper", "net_copper", "hours")
+  for _, r in ipairs(ns.LevelRows()) do
+    out[#out + 1] = Row(r.level, r.income, r.costs, r.other, r.net, ("%.2f"):format(r.secs / 3600))
+  end
+  return table.concat(out, "\n")
+end
+

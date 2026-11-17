@@ -1,5 +1,5 @@
 local ns = {}
-for _, f in ipairs({"Core","Ledger","Planner","Market","UI","Pages","Morgrim"}) do assert(loadfile(DIR .. f .. ".lua"))("JPMograineFinancial", ns) end
+for _, f in ipairs({"Core","Ledger","Planner","Market","Assets","UI","Pages","Morgrim","Broker"}) do assert(loadfile(DIR .. f .. ".lua"))("JPMograineFinancial", ns) end
 ns.Fire("ADDON_LOADED", "JPMograineFinancial"); ns.Fire("PLAYER_LOGIN"); ns.Fire("PLAYER_ENTERING_WORLD", true)
 ns.ToggleMain()
 for _, p in ipairs(ns.UI.pageOrder) do ns.ShowPage(p.name) end

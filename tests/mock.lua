@@ -116,3 +116,19 @@ function GetInboxHeaderInfo(i) local m = MAIL[i] or {}; return nil, nil, m.sende
 SENDMONEY = 0
 function GetSendMailMoney() return SENDMONEY end
 function SendMail(to, subj, body) end
+-- bags, bank and item prices
+CONTAINERS = {}     -- [bag] = { {link, count, id}, ... }
+SELLPRICE = {}      -- [itemID] = copper
+C_Container = {
+  GetContainerNumSlots = function(bag) return CONTAINERS[bag] and #CONTAINERS[bag] or 0 end,
+  GetContainerItemInfo = function(bag, slot)
+    local s = CONTAINERS[bag] and CONTAINERS[bag][slot]
+    if not s then return nil end
+    return { hyperlink = s[1], stackCount = s[2], itemID = s[3] }
+  end,
+}
+function GetItemInfo(link)
+  local id = tonumber(tostring(link):match("item:(%d+)"))
+  if not id or SELLPRICE[id] == nil then return nil end
+  return "Item" .. id, link, 1, 1, 1, "t", "s", 20, "", 0, SELLPRICE[id]
+end

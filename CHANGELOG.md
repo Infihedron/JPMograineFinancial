@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.2.0 (2026-11-17)
+
+**Gold per level**
+- Every level you play now has its own books: what you earned, what leveling cost you (repairs, ammo, food, flights and other running costs) and the time it took.
+- The forecast follows your own per-level curve, which rises as you level, instead of assuming you earn the same at 40 as at 30. It needs two finished levels; until then it uses gold per hour.
+- The Forecast tab has By level and By hour buttons. By hour is there for gold farmers; an hourly override also paces by hour.
+- Auto-deposit arrival estimates use your rising per-level income.
+- The Ledger has a By level view, the weekly statement lists your recent levels, and Morgrim talks in gold per level.
+- The Dashboard's pace card shows gold per level, and where it is heading.
+
+**Assets**
+- Bags and bank are valued at what a vendor would pay, plus auction value for wishlist items you have priced. Your bank is included once you have opened it.
+- Shown on the Dashboard, the Accounts tab, the minimap tooltip and the statement, always apart from net worth, which stays the gold you actually have.
+
+**Export and status bars**
+- Export CSV on the Ledger tab copies your transactions, daily totals and per-level books as spreadsheet text.
+- If you use Titan Panel, ChocolateBar, Bazooka or a similar bar, JP Mograine Financial shows your gold, Free and gold per level there, with the account summary on hover.
+
 ## 1.1.2 (2026-11-16)
 
 - Account arrival estimates no longer count the training reserve twice. The forecast already spends it on training.

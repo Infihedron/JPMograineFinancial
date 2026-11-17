@@ -10,7 +10,7 @@ JPMF_CharDB = { schema = 2, nextGoalId = 4, debits = { class = { [34] = 3 * G, [
   } }
 JPMF_DB = { schema = 2 }
 local ns = {}
-for _, f in ipairs({"Core","Ledger","Planner","Market","UI","Pages","Morgrim"}) do assert(loadfile(DIR .. f .. ".lua"))("JPMograineFinancial", ns) end
+for _, f in ipairs({"Core","Ledger","Planner","Market","Assets","UI","Pages","Morgrim","Broker"}) do assert(loadfile(DIR .. f .. ".lua"))("JPMograineFinancial", ns) end
 local function FIRE(ev, ...) ns.Fire(ev, ...) end
 local function money(d) MONEY = MONEY + d; FIRE("PLAYER_MONEY") end
 local function show(tag)

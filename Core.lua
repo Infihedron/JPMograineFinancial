@@ -13,7 +13,7 @@
      Core: saved data, events, error capture, debug log, slash commands, diagnostics. ]]
 
 local ADDON, ns = ...
-ns.VERSION = "1.1.2"
+ns.VERSION = "1.2.0"
 ns.SCHEMA = 3
 ns.NAME = "JP Mograine Financial"
 ns.GOLD_HEX = "e9c86a"
@@ -78,7 +78,7 @@ end
 ---------------------------------------------------------------------------
 local ACCOUNT_DEFAULTS = {
   settings = {
-    rawDays = 14, debug = false, autoPlan = true, includeProfTraining = false, includePetTraining = true, overdraft = "hold",
+    rawDays = 14, debug = false, autoPlan = true, includeProfTraining = false, includePetTraining = true, overdraft = "hold", pace = "level",
     minimap = { angle = 215, hide = false }, morgrimCreature = 8256,   -- Curator Thorius, Ironforge
     rateOverride = nil, hplOverride = nil,
   },
@@ -87,7 +87,7 @@ local ACCOUNT_DEFAULTS = {
 
 local CHAR_DEFAULTS = {
   raw = {}, daily = {}, monthly = {}, goals = {}, debits = { class = {}, prof = {}, pet = {} },
-  played = 0, levels = {}, lastPlan = 0, nextGoalId = 1, acctLog = {}, trainerIgnore = {},
+  played = 0, levels = {}, lastPlan = 0, nextGoalId = 1, acctLog = {}, levelBook = {}, assets = {}, trainerIgnore = {},
 }
 
 local function Fill(t, d)

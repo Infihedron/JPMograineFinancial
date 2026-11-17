@@ -312,7 +312,7 @@ function ns.ToggleMain(page)
   end
 end
 
-for _, ev in ipairs({ "JPMF_LEDGER_CHANGED", "JPMF_GOALS_CHANGED", "JPMF_WISHLIST_CHANGED" }) do
+for _, ev in ipairs({ "JPMF_LEDGER_CHANGED", "JPMF_GOALS_CHANGED", "JPMF_WISHLIST_CHANGED", "JPMF_ASSETS_CHANGED" }) do
   ns.On(ev, function() ns.RefreshMain() end)
 end
 
@@ -364,21 +364,33 @@ function ns.UpdateMinimap()
   mm:SetShown(not ns.acct.settings.minimap.hide)
 end
 
-local function Tooltip(owner)
-  GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
-  GameTooltip:AddLine("JP Mograine Financial", C.gold[1], C.gold[2], C.gold[3])
+-- The account summary, for any tooltip (minimap button, status-bar readout).
+function ns.FillTooltip(tt)
+  tt:AddLine("JP Mograine Financial", C.gold[1], C.gold[2], C.gold[3])
   local saved, _, free = ns.Balances()
-  GameTooltip:AddDoubleLine("Net worth", ns.Money(GetMoney(), true), 1, 1, 1, 1, 1, 1)
+  tt:AddDoubleLine("Net worth", ns.Money(GetMoney(), true), 1, 1, 1, 1, 1, 1)
   for i, g in ipairs(ns.char.goals) do
     local col = UI.AccountColor(i, g)
-    GameTooltip:AddDoubleLine("  " .. g.name, ns.Money(saved[g.id] or 0, true), col[1], col[2], col[3], 1, 1, 1)
+    tt:AddDoubleLine("  " .. g.name, ns.Money(saved[g.id] or 0, true), col[1], col[2], col[3], 1, 1, 1)
   end
   if free < 0 then
-    GameTooltip:AddDoubleLine("Overdrawn", ns.Money(-free, true), C.red[1], C.red[2], C.red[3], 1, 1, 1)
+    tt:AddDoubleLine("Overdrawn", ns.Money(-free, true), C.red[1], C.red[2], C.red[3], 1, 1, 1)
   else
-    GameTooltip:AddDoubleLine("Free to spend", ns.Money(free, true), 1, 1, 1, 1, 1, 1)
+    tt:AddDoubleLine("Free to spend", ns.Money(free, true), 1, 1, 1, 1, 1, 1)
   end
-  GameTooltip:AddLine("Left-click: open  |  Right-click: planning session", 0.62, 0.69, 0.68)
+  if ns.Assets then
+    tt:AddDoubleLine("Assets (items, separate)", ns.Money((ns.Assets()), true), 0.7, 0.7, 0.7, 1, 1, 1)
+  end
+  local fNet = ns.acct.settings.pace ~= "hour" and ns.PerLevelPace()
+  if fNet then
+    tt:AddDoubleLine("Gold per level", ns.Money(fNet(UnitLevel("player")), true), 1, 1, 1, 1, 1, 1)
+  end
+  tt:AddLine("Left-click: open \194\183 Right-click: planning session", 0.62, 0.69, 0.68)
+end
+
+local function Tooltip(owner)
+  GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
+  ns.FillTooltip(GameTooltip)
   GameTooltip:Show()
 end
 

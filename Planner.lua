@@ -465,6 +465,11 @@ function ns.Forecast(levels)
   local gph = ns.GoldPerHour() or 0
   local hpl = ns.HoursPerLevel()
   local perLevel = gph * hpl
+  -- by level (the default): your own per-level curve, rising as you level.
+  -- An hourly override, or the "by hour" setting, uses gold per hour instead.
+  local s = ns.acct.settings
+  local fNet, _, info
+  if s.pace ~= "hour" and not s.rateOverride then fNet, _, info = ns.PerLevelPace() end
   local debits = ns.Debits()
   local spendAt = {}
   for _, g in ipairs(ns.char.goals) do
@@ -477,12 +482,12 @@ function ns.Forecast(levels)
   local pts = { { level = cur, peak = gold, after = gold - due, debit = due } }
   gold = gold - due
   for lvl = cur + 1, maxL do
-    gold = gold + perLevel
+    gold = gold + (fNet and fNet(lvl - 1) or perLevel)
     local d = (debits[lvl] or 0) + (spendAt[lvl] or 0)
     pts[#pts + 1] = { level = lvl, peak = gold, after = gold - d, debit = d, spend = spendAt[lvl] }
     gold = gold - d
   end
-  return pts, gph, hpl
+  return pts, gph, hpl, fNet and info or nil
 end
 
 -- When does the forecast first hold `amount`? Returns a fractional level or nil.
@@ -505,6 +510,19 @@ function ns.GoalArrival(goal, pts)
   if goal.rule then
     local room, iph, cur = ns.AccountRoom(goal), ns.IncomePerHour(), UnitLevel("player")
     if room == 0 then return cur end
+    local s = ns.acct.settings
+    local _, fInc = nil, nil
+    if s.pace ~= "hour" and not s.rateOverride then _, fInc = ns.PerLevelPace() end
+    if fInc and room < math.huge then
+      -- walk the levels ahead, depositing the rule's share of each level's income
+      local filled = 0
+      for L = cur, 60 do
+        local add = fInc(L) * goal.rule / 100
+        if add > 0 and filled + add >= room then return L + (room - filled) / add end
+        filled = filled + add
+      end
+      return nil
+    end
     if iph and iph > 0 and room < math.huge then
       local lvl = cur + room / (iph * goal.rule / 100) / ns.HoursPerLevel()
       return lvl <= 60 and lvl or nil
@@ -537,9 +555,9 @@ end
 -- Why an account has no arrival estimate, in a few words for the screen.
 function ns.NoArrivalReason(goal)
   if ns.AccountRoom(goal) == math.huge then return "No target" end
-  if not ns.GoldPerHour() then return "Needs play data" end
-  local gph = ns.GoldPerHour()
-  if gph <= 0 then return "Not at this pace" end
+  if not ns.HasPace() then return "Needs play data" end
+  local gph = ns.GoldPerHour() or 0
+  if gph <= 0 and not ns.PerLevelPace() then return "Not at this pace" end
   -- if planned training drains the forecast, that is the reason
   for _, p in ipairs(ns.Forecast(15)) do
     if p.after < 0 then return ("Short at Lv %d"):format(p.level) end
@@ -675,9 +693,13 @@ function ns.MorgrimLines()
       ns.Money(short.debit), ns.Money(math.min(-short.after, short.debit)))
   end
   local gph = ns.GoldPerHour()
-  if gph and gph < 0 then
-    lines[#lines + 1] = "You are spending faster than you earn. Let us slow the bleeding before we save."
-  elseif gph then
+  local fNet, _, info = ns.PerLevelPace()
+  if fNet and ns.acct.settings.pace ~= "hour" then
+    local rows, last = ns.LevelRows(), nil
+    for _, r in ipairs(rows) do if r.complete then last = r end end
+    lines[#lines + 1] = ("Your level %d brought in %s after running costs. At this rate, level %d should bring about %s. Income rises as you climb; plan accordingly."):format(
+      last.level, ns.Money(last.net), cur + 3, ns.Money(fNet(cur + 3)))
+  elseif gph and gph > 0 then
     lines[#lines + 1] = ("You are clearing %s per hour played. Steady work."):format(ns.Money(gph))
   end
   -- best ground: the zone with the best net per hour, given at least half an hour there
