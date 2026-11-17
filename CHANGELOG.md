@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.2 (2026-11-16)
+
+- Account arrival estimates no longer count the training reserve twice. The forecast already spends it on training.
+- An account only shows as filling once your gold stays above it through every planned training cost ahead, not just today.
+- Accounts without an estimate now say why: "Needs play data", "Short at Lv 40" when planned training uses up your gold, "Not at this pace" or "15+ levels away".
+- The stable slot preset is confirmed at 5g in WoW: Forever, with no reputation discount.
+
 ## 1.1.1 (2026-11-16)
 
 - Settings: the options are in two columns, so they no longer run into the Your data panel.

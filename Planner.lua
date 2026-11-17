@@ -510,12 +510,41 @@ function ns.GoalArrival(goal, pts)
       return lvl <= 60 and lvl or nil
     end
   end
-  -- otherwise: when will your gold cover every balance plus what this account still needs?
+  -- otherwise: when will your gold cover the other accounts plus what this one still needs?
+  -- The training reserve is left out: the forecast already spends it on training.
   local room = ns.AccountRoom(goal)
   if room == math.huge then return nil end
   if room == 0 then return UnitLevel("player") end
-  local _, held = ns.Balances()
-  return ns.ArrivalLevel(held + room, pts)
+  local held = 0
+  for _, g in ipairs(ns.char.goals) do
+    if g.kind ~= "training" then held = held + (g.balance or 0) end
+  end
+  pts = pts or ns.Forecast(15)
+  -- A purchase at a set level (like the mount at 40) is already a step in the
+  -- forecast: it arrives when the gold peaks high enough before that step.
+  if goal.spend and goal.level then return ns.ArrivalLevel(held + room, pts) end
+  -- Anything else is safe to fill only once your gold stays above it through
+  -- every planned cost still ahead in the forecast.
+  local need = held + room
+  for i = 1, #pts do
+    local low = math.huge
+    for j = i, #pts do low = min(low, pts[j].after) end
+    if low >= need then return pts[i].level end
+  end
+  return nil
+end
+
+-- Why an account has no arrival estimate, in a few words for the screen.
+function ns.NoArrivalReason(goal)
+  if ns.AccountRoom(goal) == math.huge then return "No target" end
+  if not ns.GoldPerHour() then return "Needs play data" end
+  local gph = ns.GoldPerHour()
+  if gph <= 0 then return "Not at this pace" end
+  -- if planned training drains the forecast, that is the reason
+  for _, p in ipairs(ns.Forecast(15)) do
+    if p.after < 0 then return ("Short at Lv %d"):format(p.level) end
+  end
+  return "15+ levels away"
 end
 
 -- True when Free already holds enough to fill this account today.
@@ -616,7 +645,8 @@ function ns.MorgrimLines()
       local eta = ns.GoalArrival(top, pts)
       local when = ns.CanFillNow(top) and " You have enough free gold to fill it today, if you wish."
         or eta and (" At your pace it fills around level %.1f."):format(eta)
-        or " I need more play time before I can date it."
+        or (ns.NoArrivalReason(top) == "Needs play data" and " I need more play time before I can date it."
+          or " At your current pace it does not fill in the next fifteen levels. A standing order would help.")
       lines[#lines + 1] = ("Your %s account stands at %s of %s, %d percent.%s"):format(top.name, ns.Money(s), ns.Money(t),
         floor(s / t * 100), when)
     end

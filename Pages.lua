@@ -431,7 +431,7 @@ ns.RegisterPage("Accounts", function(page, f)
       ns.Money(GetMoney(), true), ns.Money(held, true),
       free < 0 and ("|cfff08b80Overdrawn %s|r"):format(ns.Money(-free)) or ("Free %s"):format(ns.Money(free, true))))
     local saved = ns.Balances()
-    local pts = ns.Forecast(20)
+    local pts = ns.Forecast(15)
     local list = ns.char.goals
     for i, r in ipairs(rows) do
       local g = list[i]
@@ -452,7 +452,7 @@ ns.RegisterPage("Accounts", function(page, f)
         r.amt:SetText(t > 0 and (ns.Money(s) .. " of " .. ns.Money(t)) or ns.Money(s))
         local eta = (t > 0 and s < t) and ns.GoalArrival(g, pts)
         r.eta:SetText(t <= 0 and (g.kind == "training" and "Visit your trainer" or "") or s >= t and "|cff5fd08aFunded|r" or
-          ns.CanFillNow(g) and "|cff5fd08aCan fill now|r" or eta and ("Full around Lv %.1f"):format(eta) or "Not yet forecast")
+          ns.CanFillNow(g) and "|cff5fd08aCan fill now|r" or eta and ("Full around Lv %.1f"):format(eta) or ns.NoArrivalReason(g))
         r.up:SetEnabled(i > 1); r.down:SetEnabled(i < #list)
         r.set:SetShown(g.kind ~= "training")
         r.out:SetEnabled(s > 0)
