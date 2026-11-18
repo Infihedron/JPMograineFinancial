@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1 (2026-11-17)
+
+- Fixed: visiting a riding trainer replaced your class training plan with riding prices, so your mount was counted twice (once as training, once in your riding account) and your real class training dropped out. Riding trainers are now recognized on their own. If this happened to you, the bad plan is cleared; visit your class trainer once to rebuild it.
+- Your riding trainer's actual price, after any reputation discount, becomes the target of your Riding at 40 and Riding at 60 accounts (unless you set your own).
+- Buying riding is recorded as Riding and paid from your riding account.
+- Dual Talent Specialization is never counted as class training. If you want it, open the Dual spec at 40 account.
+- /jpm report shows the riding trainer scan.
+
 ## 1.2.0 (2026-11-17)
 
 **Gold per level**

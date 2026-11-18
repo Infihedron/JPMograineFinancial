@@ -202,6 +202,16 @@ ns.On("JPMF_LEDGER_CHANGED", function(_, amount, cat)
         end
       end
     end
+  elseif amount < 0 and cat == "Riding" then
+    for _, g in ipairs(ns.char.goals) do
+      if (g.kind == "riding40" or g.kind == "riding60") and (g.balance or 0) > 0 then
+        local pay = min(-amount, g.balance)
+        g.balance = g.balance - pay
+        Note(g, -pay, "paid for riding")
+        changed = true
+        break
+      end
+    end
   elseif amount < 0 and type(cat) == "string" and cat:find("training$") then
     for _, g in ipairs(ns.char.goals) do
       if g.kind == "training" and (g.balance or 0) > 0 then
@@ -299,6 +309,16 @@ local PET_SKILLS = { ["Great Stamina"] = true, ["Natural Armor"] = true, ["Growl
   ["Nature Resistance"] = true, ["Shadow Resistance"] = true }
 function ns.TrainerKind()
   if IsTradeskillTrainer and IsTradeskillTrainer() then return "profession" end
+  -- a riding trainer lists only riding skills; those are your mount, not class training
+  local riding, all = 0, 0
+  for i = 1, (GetNumTrainerServices and GetNumTrainerServices() or 0) do
+    local name = GetTrainerServiceInfo(i)
+    if type(name) == "string" and name ~= "" then
+      all = all + 1
+      if name:find("Riding$") then riding = riding + 1 end
+    end
+  end
+  if riding > 0 and riding == all then return "riding" end
   if C_TooltipInfo and C_TooltipInfo.GetUnit then
     local ok, data = pcall(C_TooltipInfo.GetUnit, "npc")
     for _, line in ipairs(ok and data and data.lines or {}) do
@@ -400,6 +420,13 @@ local function ScanTrainer()
     end
   end
   for name in pairs(ns.char.trainerIgnore or {}) do skip[name] = true; why[name] = why[name] or "you" end
+  -- never class training: riding (your mount accounts plan it) and dual specialization
+  -- (an optional 50g purchase; open the Dual spec account if you want to save for it)
+  for _, e in ipairs(list) do
+    if type(e.name) == "string" and (e.name:find("Riding$") or (e.name:find("Dual") and e.name:find("Spec"))) then
+      skip[e.name] = true; why[e.name] = why[e.name] or "optional"
+    end
+  end
   for name, w in pairs(why) do
     if w == "talent" then dump.skipped[#dump.skipped + 1] = name end
   end
@@ -426,7 +453,21 @@ local function ScanTrainer()
   -- class, pet and profession scans are kept apart; "scannedAt" is the class trainer's.
   -- (Pet skill level requirements are your pet's level, close enough to yours to plan by.)
   local d = ns.char.debits
-  if kind == "profession" then
+  if kind == "riding" then
+    -- the trainer's real price (after any reputation discount) becomes your riding accounts' target
+    local costs = {}
+    for _, e in ipairs(list) do
+      if type(e.name) == "string" and e.cost > 0 then costs[e.name] = e.cost end
+    end
+    d.riding, d.ridingAt = costs, time()
+    for _, g in ipairs(ns.char.goals) do
+      local price = (g.kind == "riding40" and costs["Apprentice Riding"]) or (g.kind == "riding60" and costs["Journeyman Riding"])
+      if price and (g.priceFromTrainer or g.target == (g.kind == "riding40" and 100 or 1000) * 10000) then
+        if g.target ~= price then ns.Say(("%s: your riding trainer charges %s, so I set that as the target."):format(g.name, ns.Money(price))) end
+        g.target, g.priceFromTrainer = price, true
+      end
+    end
+  elseif kind == "profession" then
     d.prof, d.profAt = byLevel, time()
   elseif kind == "pet" then
     d.pet, d.petAt = byLevel, time()
@@ -614,6 +655,7 @@ local TIPS = {
   ["Crafting materials"] = "Materials are an investment only if what you make is worth more than what you paid.",
   ["Reagents"] = "Reagents are a cost of doing business. Buy what you will use this week, not this year.",
   ["Auction house"] = "The auction house rewards patience. Watch a price for a few days before buying.",
+  ["Riding"] = "A mount is the best investment an adventurer makes. Every hour after pays you back in minutes.",
   ["Pet training"] = "A well-trained companion is a capital asset. Spend accordingly.",
   ["Profession training"] = "Professions pay back over time. A sound investment, within reason.",
   ["Stable"] = "A stable slot is a one-time cost. I will not hold it against you.",

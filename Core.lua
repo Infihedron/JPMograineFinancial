@@ -13,8 +13,8 @@
      Core: saved data, events, error capture, debug log, slash commands, diagnostics. ]]
 
 local ADDON, ns = ...
-ns.VERSION = "1.2.0"
-ns.SCHEMA = 3
+ns.VERSION = "1.2.1"
+ns.SCHEMA = 4
 ns.NAME = "JP Mograine Financial"
 ns.GOLD_HEX = "e9c86a"
 
@@ -109,6 +109,23 @@ local MIGRATIONS = {
   -- 3: Morgrim's default portrait is now Curator Thorius; keep any portrait the player chose
   [3] = function(db)
     if db.settings and db.settings.morgrimCreature == 2455 then db.settings.morgrimCreature = 8256 end
+  end,
+  -- 4: versions before 1.2.1 could file a riding trainer's prices as class training
+  [4] = function(db)
+    local dumps = db.trainerDumps
+    if dumps and dumps.class then
+      for _, line in ipairs(dumps.class.sample or {}) do
+        if line:find("Riding ;") then dumps.riding, dumps.class = dumps.class, nil; break end
+      end
+    end
+    local d = db.debits
+    if d and d.class then
+      local onlyRiding = next(d.class) ~= nil
+      for lvl, cost in pairs(d.class) do
+        if not ((lvl == 40 or lvl == 60) and cost >= 500000) then onlyRiding = false end
+      end
+      if onlyRiding then d.class, d.scannedAt = {}, nil end
+    end
   end,
 }
 
@@ -231,12 +248,17 @@ function ns.Report()
   end
   add("Class trainer scan: %s / %s", d.scannedAt and date("%m-%d %H:%M", d.scannedAt) or "never", Levels(d.class))
   add("Pet trainer scan: %s / %s", d.petAt and date("%m-%d %H:%M", d.petAt) or "never", Levels(d.pet))
+  local rid = {}
+  for name, cost in pairs(d.riding or {}) do rid[#rid + 1] = name .. "=" .. ns.Money(cost) end
+  table.sort(rid)
+  add("Riding trainer scan: %s / %s", d.ridingAt and date("%m-%d %H:%M", d.ridingAt) or "never",
+    #rid > 0 and table.concat(rid, ", ") or "none")
   add("Profession trainer scan: %s / %s", d.profAt and date("%m-%d %H:%M", d.profAt) or "never", Levels(d.prof))
   local ign = {}
   for name in pairs(ns.char.trainerIgnore or {}) do ign[#ign + 1] = name end
   table.sort(ign)
   add("Skipped by you: %s", #ign > 0 and table.concat(ign, ", ") or "none")
-  for _, kind in ipairs({ "class", "pet", "profession", "empty" }) do
+  for _, kind in ipairs({ "class", "pet", "riding", "profession", "empty" }) do
     local td = (ns.acct.trainerDumps or {})[kind]
     if td then
       local cats = {}

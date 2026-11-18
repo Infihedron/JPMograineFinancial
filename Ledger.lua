@@ -7,7 +7,7 @@ local floor, max = math.floor, math.max
 
 ns.CATEGORIES = {
   "Quests", "Loot", "Vendor sales", "Auction house", "Mail", "Trade",
-  "Class training", "Pet training", "Profession training", "Flights", "Repairs",
+  "Class training", "Pet training", "Profession training", "Riding", "Flights", "Repairs",
   "Ammo", "Food & drink", "Crafting materials", "Reagents", "Vendor purchases",
   "Stable", "Bank", "Transfers", "Unreconciled", "Other",
 }
@@ -123,7 +123,8 @@ function ns.Classify(delta)
   if delta > 0 and (now - mark.quest < 2 or ctx.quest) then return "Quests" end
   if ctx.trainer and delta < 0 then
     local kind = ns.TrainerKind and ns.TrainerKind() or "class"
-    return kind == "profession" and "Profession training" or kind == "pet" and "Pet training" or "Class training"
+    return kind == "profession" and "Profession training" or kind == "pet" and "Pet training"
+      or kind == "riding" and "Riding" or "Class training"
   end
   if ctx.stable and delta < 0 then return "Stable" end
   if ctx.ah then return "Auction house" end
@@ -334,7 +335,7 @@ function ns.GoldPerHour()
   local net = 0
   for cat, e in pairs(byCat) do
     if cat ~= "Class training" and cat ~= "Pet training" and cat ~= "Profession training"
-      and cat ~= "Unreconciled" and cat ~= "Transfers" then
+      and cat ~= "Riding" and cat ~= "Unreconciled" and cat ~= "Transfers" then
       net = net + e[1] + (cat == "Auction house" and 0 or e[2])
     end
   end
