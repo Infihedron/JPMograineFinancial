@@ -6,6 +6,8 @@
 - Your riding trainer's actual price, after any reputation discount, becomes the target of your Riding at 40 and Riding at 60 accounts (unless you set your own).
 - Buying riding is recorded as Riding and paid from your riding account.
 - Dual Talent Specialization is never counted as class training. If you want it, open the Dual spec at 40 account.
+- New Talents category: talent resets and dual specialization, bought through a trainer's dialogue, are recorded as Talents instead of Other, and dual spec is paid from your Dual spec account.
+- Riding presets now assume the reputation discount most players have by 40: Riding at 40 is 90g and Riding at 60 is 900g. Accounts still on the old 100g and 1,000g targets are updated.
 - /jpm report shows the riding trainer scan.
 
 ## 1.2.0 (2026-11-17)

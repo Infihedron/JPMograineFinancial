@@ -10,14 +10,15 @@ local G = 10000
 -- Account presets
 ---------------------------------------------------------------------------
 -- Preset amounts are WoW: Forever prices as reported at launch (November 2026);
--- the player can change any target. Reputation discounts are not applied.
+-- the player can change any target. Riding assumes the reputation discount most
+-- players have by 40; visiting a riding trainer replaces it with the real price.
 ns.PRESETS = {
-  { kind = "riding40",   name = "Riding at 40",        target = 100 * G,  level = 40, spend = true,
-    note = "100g for riding, and your first mount comes with it. Honored with your home city is reported to take 10% off." },
+  { kind = "riding40",   name = "Riding at 40",        target = 90 * G,   level = 40, spend = true,
+    note = "90g with the reputation discount most players have by 40 (100g without), and your first mount comes with it. Visit your riding trainer and the target updates to your real price." },
   { kind = "dualspec",   name = "Dual spec at 40",     target = 50 * G,   level = 40, spend = true,
-    note = "Reported at 50g from your class trainer. If your trainer scan already shows it, you can close this account." },
-  { kind = "riding60",   name = "Riding at 60",        target = 1000 * G, level = 60, spend = true,
-    note = "1,000g for fast riding. An epic mount is reported at about 200g more; raise the target if you want one." },
+    note = "50g from your class trainer at 40. It is never counted as class training, so save for it here; the purchase is paid from this account." },
+  { kind = "riding60",   name = "Riding at 60",        target = 900 * G,  level = 60, spend = true,
+    note = "900g for fast riding with the reputation discount (1,000g without). An epic mount is reported at about 200g more; raise the target if you want one." },
   { kind = "training",   name = "Training reserve",    auto = true,
     note = "Fills itself from your class trainer's prices for your next six levels." },
   { kind = "stable",     name = "Stable slot",         target = 5 * G,
@@ -200,6 +201,17 @@ ns.On("JPMF_LEDGER_CHANGED", function(_, amount, cat)
           Note(g, want, ("auto %d%% of %s"):format(g.rule, (cat or "income"):lower()))
           changed = true
         end
+      end
+    end
+  elseif amount < 0 and cat == "Talents" then
+    -- dual specialization is paid from the Dual spec account; a cheap respec is not
+    for _, g in ipairs(ns.char.goals) do
+      if g.kind == "dualspec" and (g.balance or 0) > 0 and -amount >= 400000 then
+        local pay = min(-amount, g.balance)
+        g.balance = g.balance - pay
+        Note(g, -pay, "paid for dual specialization")
+        changed = true
+        break
       end
     end
   elseif amount < 0 and cat == "Riding" then
@@ -462,7 +474,8 @@ local function ScanTrainer()
     d.riding, d.ridingAt = costs, time()
     for _, g in ipairs(ns.char.goals) do
       local price = (g.kind == "riding40" and costs["Apprentice Riding"]) or (g.kind == "riding60" and costs["Journeyman Riding"])
-      if price and (g.priceFromTrainer or g.target == (g.kind == "riding40" and 100 or 1000) * 10000) then
+      local presets = g.kind == "riding40" and { [900000] = true, [1000000] = true } or { [9000000] = true, [10000000] = true }
+      if price and (g.priceFromTrainer or presets[g.target]) then
         if g.target ~= price then ns.Say(("%s: your riding trainer charges %s, so I set that as the target."):format(g.name, ns.Money(price))) end
         g.target, g.priceFromTrainer = price, true
       end
@@ -655,6 +668,7 @@ local TIPS = {
   ["Crafting materials"] = "Materials are an investment only if what you make is worth more than what you paid.",
   ["Reagents"] = "Reagents are a cost of doing business. Buy what you will use this week, not this year.",
   ["Auction house"] = "The auction house rewards patience. Watch a price for a few days before buying.",
+  ["Talents"] = "Every respec costs more than the last. Settle on a build before you pay to change it again.",
   ["Riding"] = "A mount is the best investment an adventurer makes. Every hour after pays you back in minutes.",
   ["Pet training"] = "A well-trained companion is a capital asset. Spend accordingly.",
   ["Profession training"] = "Professions pay back over time. A sound investment, within reason.",

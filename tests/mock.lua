@@ -132,3 +132,5 @@ function GetItemInfo(link)
   if not id or SELLPRICE[id] == nil then return nil end
   return "Item" .. id, link, 1, 1, 1, "t", "s", 20, "", 0, SELLPRICE[id]
 end
+function ConfirmTalentWipe() end
+function StaticPopup_Show(which) end

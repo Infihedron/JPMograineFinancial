@@ -7,7 +7,7 @@ local floor, max = math.floor, math.max
 
 ns.CATEGORIES = {
   "Quests", "Loot", "Vendor sales", "Auction house", "Mail", "Trade",
-  "Class training", "Pet training", "Profession training", "Riding", "Flights", "Repairs",
+  "Class training", "Pet training", "Profession training", "Riding", "Talents", "Flights", "Repairs",
   "Ammo", "Food & drink", "Crafting materials", "Reagents", "Vendor purchases",
   "Stable", "Bank", "Transfers", "Unreconciled", "Other",
 }
@@ -17,7 +17,8 @@ ns.CATEGORIES = {
 ---------------------------------------------------------------------------
 local ctx = { merchant = false, taxi = false, trainer = false, trainerKind = "class", mail = false,
               ah = false, trade = false, loot = false, stable = false, quest = false, bank = false }
-local mark = { repair = 0, flight = 0, quest = 0, loot = 0, mailAH = 0, buy = 0, transferIn = 0, transferOut = 0 }
+local mark = { repair = 0, flight = 0, quest = 0, loot = 0, mailAH = 0, buy = 0, transferIn = 0, transferOut = 0,
+               talents = 0, gossip = 0 }
 local buyCat
 ns.ctx = ctx
 
@@ -39,6 +40,22 @@ ns.On("TRAINER_SHOW", function()
 end)
 ns.On("TRAINER_CLOSED", Open("trainer", false))
 ns.On("QUEST_TURNED_IN", function() mark.quest = GetTime() end)
+
+-- Talents: a respec or dual specialization, bought through a trainer's dialogue and a
+-- confirmation window (not the training window). Watch the confirmations, and keep a
+-- short memory of the last dialogue in case the window has another name.
+ns.On("GOSSIP_SHOW", function() ctx.gossip = true end)
+ns.On("GOSSIP_CLOSED", function() ctx.gossip = false; mark.gossip = GetTime() end)
+if ConfirmTalentWipe then hooksecurefunc("ConfirmTalentWipe", function() mark.talents = GetTime() end) end
+if StaticPopup_Show then
+  hooksecurefunc("StaticPopup_Show", function(which)
+    if type(which) == "string" and (which:find("TALENT") or which:find("SPEC")) then mark.talents = GetTime() end
+  end)
+end
+-- a whole number of gold between 1g and 60g, the shape of respec and dual spec prices
+local function TalentPrice(delta)
+  return delta < 0 and -delta % 10000 == 0 and -delta >= 10000 and -delta <= 600000
+end
 ns.On("CHAT_MSG_MONEY", function() mark.loot = GetTime() end)
 
 if RepairAllItems then hooksecurefunc("RepairAllItems", function() mark.repair = GetTime() end) end
@@ -121,6 +138,11 @@ function ns.Classify(delta)
   if delta < 0 and (now - mark.repair < 2 or (ctx.merchant and InRepairMode and InRepairMode())) then return "Repairs" end
   if delta < 0 and (ctx.taxi or now - mark.flight < 3) then return "Flights" end
   if delta > 0 and (now - mark.quest < 2 or ctx.quest) then return "Quests" end
+  local busy = ctx.merchant or ctx.ah or ctx.mail or ctx.trade or ctx.bank or ctx.taxi or ctx.trainer or ctx.stable
+  if delta < 0 and (now - mark.talents < 30
+      or (not busy and (ctx.gossip or now - mark.gossip < 30) and TalentPrice(delta))) then
+    return "Talents"
+  end
   if ctx.trainer and delta < 0 then
     local kind = ns.TrainerKind and ns.TrainerKind() or "class"
     return kind == "profession" and "Profession training" or kind == "pet" and "Pet training"
@@ -335,7 +357,7 @@ function ns.GoldPerHour()
   local net = 0
   for cat, e in pairs(byCat) do
     if cat ~= "Class training" and cat ~= "Pet training" and cat ~= "Profession training"
-      and cat ~= "Riding" and cat ~= "Unreconciled" and cat ~= "Transfers" then
+      and cat ~= "Riding" and cat ~= "Talents" and cat ~= "Unreconciled" and cat ~= "Transfers" then
       net = net + e[1] + (cat == "Auction house" and 0 or e[2])
     end
   end

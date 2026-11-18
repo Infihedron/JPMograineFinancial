@@ -31,3 +31,15 @@ FIRE("TRAINER_SHOW"); FIRE("TRAINER_CLOSED")
 print("class scan:", ns.char.debits.class[36], ns.char.debits.class[40])
 print(ns.Report():match("Riding trainer scan[^\n]+"))
 print("errors", #JPMF_DB.errors); for _, e in ipairs(JPMF_DB.errors) do print(e.msg) end
+-- Talents: a respec confirmed from a trainer's dialogue, and dual spec paid from its account
+print("riding preset:", ns.Money(ns.PRESETS[1].target), ns.Money(ns.PRESETS[3].target))
+ADV(60); FIRE("GOSSIP_SHOW"); FIRE("GOSSIP_CLOSED"); StaticPopup_Show("CONFIRM_TALENT_WIPE"); ConfirmTalentWipe(); money(-1 * G)
+print("respec category:", JPMF_CharDB.raw[#JPMF_CharDB.raw].c)
+local ds = ns.AddAccount(ns.PRESETS[2]); ds.balance = 50 * G
+ADV(60); FIRE("GOSSIP_SHOW"); money(-50 * G); FIRE("GOSSIP_CLOSED")
+print("dual spec category:", JPMF_CharDB.raw[#JPMF_CharDB.raw].c, "| dual spec account left:", ns.Money(ds.balance))
+ADV(60); FIRE("MERCHANT_SHOW"); money(-1 * G); FIRE("MERCHANT_CLOSED")
+print("1g at a vendor later:", JPMF_CharDB.raw[#JPMF_CharDB.raw].c)
+print("errors after talents", #JPMF_DB.errors); for _, e in ipairs(JPMF_DB.errors) do print(e.msg) end
+ADV(60); mark_ok = true; FIRE("GOSSIP_SHOW"); FIRE("GOSSIP_CLOSED"); FIRE("MERCHANT_SHOW"); money(-1 * G); FIRE("MERCHANT_CLOSED")
+print("1g at a vendor reached through dialogue:", JPMF_CharDB.raw[#JPMF_CharDB.raw].c)

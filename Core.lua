@@ -126,6 +126,11 @@ local MIGRATIONS = {
       end
       if onlyRiding then d.class, d.scannedAt = {}, nil end
     end
+    -- riding presets now assume the reputation discount
+    for _, g in ipairs(db.goals or {}) do
+      if g.kind == "riding40" and g.target == 1000000 then g.target = 900000 end
+      if g.kind == "riding60" and g.target == 10000000 then g.target = 9000000 end
+    end
   end,
 }
 
