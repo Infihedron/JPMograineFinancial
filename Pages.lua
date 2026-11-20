@@ -60,7 +60,7 @@ local function DrawForecast(holder, lines, texts, w, h, levels, compact)
   local pts, gph, hpl = ns.Forecast(levels)
   local padL, padB, padT, padR = 44, 22, 14, 14
   local cw, ch = w - padL - padR, h - padB - padT
-  if not gph then
+  if not ns.HasPace() then
     if nowDots[holder] then nowDots[holder]:Hide() end
     local t = texts:Get(12, C.muted)
     t:SetPoint("CENTER", holder, "CENTER")
@@ -83,9 +83,26 @@ local function DrawForecast(holder, lines, texts, w, h, levels, compact)
     if p.after < short then short, shortLevel = p.after, p.level end
   end
   for _, g in ipairs(goals) do ymax = max(ymax, g.amount) end
+  -- the last two levels you actually played, drawn solid to the left of "now"
+  local cur = pts[1].level
+  local hist = {}
+  for _, h in ipairs(ns.LevelHistory()) do
+    if h.level >= cur - 2 and h.level <= cur then hist[#hist + 1] = h; ymax = max(ymax, h.gold) end
+  end
   ymax = max(ymax * 1.1, 10000)
-  local L0, L1 = pts[1].level, pts[#pts].level
-  local function X(l) return padL + (L1 > L0 and (l - L0) / (L1 - L0) or 0) * cw end
+  -- "now" sits partway through your current level, by experience
+  local frac = 0
+  if UnitXP and UnitXPMax then
+    local ok, xp, mx = pcall(function() return UnitXP("player"), UnitXPMax("player") end)
+    if ok and type(xp) == "number" and type(mx) == "number" and mx > 0 then frac = min(0.95, xp / mx) end
+  end
+  local nowX = cur + frac
+  local L0, L1 = (#hist > 0 and hist[1].level or cur), pts[#pts].level
+  local function X(l)
+    if l == cur then l = nowX end
+    return padL + (L1 > L0 and (l - L0) / (L1 - L0) or 0) * cw
+  end
+  local function XL(l) return padL + (L1 > L0 and (l - L0) / (L1 - L0) or 0) * cw end
   local function Y(v) return padB + (max(v, 0) - ymin) / (ymax - ymin) * ch end
 
   -- gridlines and gold ticks
@@ -99,8 +116,22 @@ local function DrawForecast(holder, lines, texts, w, h, levels, compact)
   local step = (L1 - L0) > 10 and 2 or 1
   for l = L0, L1, step do
     local t = texts:Get(10, C.muted, UI.NUM)
-    t:SetPoint("TOP", holder, "BOTTOMLEFT", X(l), padB - 4)
+    t:SetPoint("TOP", holder, "BOTTOMLEFT", XL(l), padB - 4)
     t:SetText(l == L0 and ("Lv " .. l) or tostring(l))
+  end
+  -- history: gold as you reached each recent level, then on to now
+  for i, h in ipairs(hist) do
+    local nx, ny
+    if hist[i + 1] then nx, ny = XL(hist[i + 1].level), Y(hist[i + 1].gold) else nx, ny = X(cur), Y(pts[1].peak) end
+    lines:Line(XL(h.level), Y(h.gold), nx, ny, C.text, 2)
+    local tick = texts:Get(9, C.muted, UI.NUM)
+    tick:SetPoint("BOTTOM", holder, "BOTTOMLEFT", XL(h.level), Y(h.gold) + 4)
+    tick:SetText(ns.Money(h.gold))
+  end
+  if #hist > 0 and not compact then
+    local lab = texts:Get(10, C.muted)
+    lab:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", XL(hist[1].level) + 2, padB + 4)
+    lab:SetText("your last levels")
   end
   -- goal lines
   for _, g in ipairs(goals) do
@@ -307,6 +338,10 @@ ns.RegisterPage("Dashboard", function(page, f)
         local eta = (t > 0 and s < t) and ns.GoalArrival(g, pts)
         local bits = {}
         if g.rule then bits[#bits + 1] = ("Auto %d%%"):format(g.rule) end
+        if g.kind == "training" and t > 0 then
+          local _, lvl = ns.NextTraining()
+          if lvl then bits[#bits + 1] = lvl <= UnitLevel("player") and "Train now" or ("For Lv " .. lvl) end
+        end
         if t <= 0 then
           bits[#bits + 1] = g.kind == "training" and "Visit your class trainer" or "No target"
         elseif s >= t then
@@ -458,7 +493,11 @@ ns.RegisterPage("Accounts", function(page, f)
         r.name:SetText(g.name)
         local note = {}
         if g.rule then note[#note + 1] = ("Auto %d%% of income"):format(g.rule) end
-        if g.kind == "training" then note[#note + 1] = "pays your training"
+        if g.kind == "training" then
+          local _, lvl = ns.NextTraining()
+          note[#note + 1] = not lvl and "pays your training"
+            or lvl <= UnitLevel("player") and "next session: now, at your trainer"
+            or ("next session: level %d"):format(lvl)
         elseif g.level then note[#note + 1] = "spent at level " .. g.level end
         r.note:SetText(#note > 0 and table.concat(note, ", ") or "Savings")
         r.bar:Set(t > 0 and s / t or (s > 0 and 1 or 0), col)
@@ -476,12 +515,167 @@ ns.RegisterPage("Accounts", function(page, f)
 end)
 
 ---------------------------------------------------------------------------
+-- History chart: gold by level reached, or by day
+---------------------------------------------------------------------------
+local function LevelOn(t)
+  local lvl = 1
+  for L, rec in pairs(ns.char.levelGold or {}) do
+    if rec.t and rec.t <= t and L > lvl then lvl = L end
+  end
+  return lvl
+end
+
+function ns.DrawHistory(holder, lines, texts, hover, w, h, mode, range, card1, card2)
+  lines:Reset(); texts:Reset()
+  for _, b in ipairs(hover) do b:Hide() end
+  local padL, padB, padT, padR = 44, 22, 14, 14
+  local cw, ch = w - padL - padR, h - padB - padT
+  local pts = {}
+  if mode == "level" then
+    for _, r in ipairs(ns.LevelHistory()) do pts[#pts + 1] = { x = r.level, gold = r.gold, rec = r } end
+    pts[#pts + 1] = { x = UnitLevel("player") + 0.5, gold = GetMoney(), now = true }
+  else
+    for _, r in ipairs(ns.DailyHistory(range)) do pts[#pts + 1] = { x = r.t, gold = r.gold, rec = r } end
+  end
+  if #pts < 2 then
+    local t = texts:Get(12, C.muted)
+    t:SetPoint("CENTER", holder, "CENTER")
+    t:SetText(mode == "level" and "Your gold at each level shows here once you have reached a level or two with the addon running."
+      or "Your daily gold history builds up as you play.")
+    card1.text:SetText(""); card2.text:SetText("")
+    return
+  end
+  local x0, x1, ymax = pts[1].x, pts[#pts].x, 0
+  for _, p in ipairs(pts) do ymax = max(ymax, p.gold) end
+  ymax = max(ymax * 1.1, 10000)
+  local function X(x) return padL + (x1 > x0 and (x - x0) / (x1 - x0) or 0) * cw end
+  local function Y(v) return padB + max(v, 0) / ymax * ch end
+  for i = 0, 4 do
+    local v = ymax * i / 4
+    lines:Line(padL, Y(v), padL + cw, Y(v), C.grid, 1)
+    local t = texts:Get(10, C.muted, UI.NUM)
+    t:SetPoint("RIGHT", holder, "BOTTOMLEFT", padL - 6, Y(v))
+    t:SetText(floor(v / 10000) .. "g")
+  end
+  -- axis labels: every level, or about six dates
+  if mode == "level" then
+    for _, p in ipairs(pts) do
+      if not p.now then
+        local t = texts:Get(10, C.muted, UI.NUM)
+        t:SetPoint("TOP", holder, "BOTTOMLEFT", X(p.x), padB - 4)
+        t:SetText(tostring(p.x))
+      end
+    end
+  else
+    local every = max(1, floor(#pts / 6))
+    for i = 1, #pts, every do
+      local t = texts:Get(10, C.muted, UI.NUM)
+      t:SetPoint("TOP", holder, "BOTTOMLEFT", X(pts[i].x), padB - 4)
+      t:SetText(date("%b %d", pts[i].x))
+    end
+  end
+  -- the line, then a hover spot on each point
+  for i = 2, #pts do
+    local a, b = pts[i - 1], pts[i]
+    if b.now then
+      UI.Dashed(lines, X(a.x), Y(a.gold), X(b.x), Y(b.gold), C.gold, 2, 5, 4)
+    else
+      lines:Line(X(a.x), Y(a.gold), X(b.x), Y(b.gold), C.gold, 2.5)
+    end
+  end
+  for i, p in ipairs(pts) do
+    local b = hover[i]
+    if not b then
+      b = CreateFrame("Frame", nil, holder)
+      b:SetSize(14, 14)
+      b.dot = b:CreateTexture(nil, "OVERLAY")
+      b.dot:SetSize(6, 6); b.dot:SetPoint("CENTER")
+      b:EnableMouse(true)
+      b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        for _, line in ipairs(self.tip or {}) do GameTooltip:AddLine(line[1], line[2], line[3], line[4], true) end
+        GameTooltip:Show()
+      end)
+      b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+      hover[i] = b
+    end
+    local col = p.now and C.mint or C.gold
+    b.dot:SetColorTexture(col[1], col[2], col[3], 1)
+    b:ClearAllPoints()
+    b:SetPoint("CENTER", holder, "BOTTOMLEFT", X(p.x), Y(p.gold))
+    local tip = {}
+    local function add(text, c) c = c or C.text; tip[#tip + 1] = { text, c[1], c[2], c[3] } end
+    if p.now then
+      add("Now: " .. ns.Money(p.gold, true), C.mint)
+    elseif mode == "level" then
+      local r = p.rec
+      add(("Reached level %d%s"):format(r.level, r.t and (" on " .. date("%b %d", r.t)) or " (estimated)"), C.gold)
+      add("Gold then: " .. ns.Money(r.gold, true))
+      local lb = ns.char.levelBook[r.level - 1]
+      if lb then
+        local net = 0
+        for cat, e in pairs(lb.cats or {}) do
+          if not cat:find("training$") and cat ~= "Riding" and cat ~= "Talents" then net = net + e[1] + e[2] end
+        end
+        add(("Level %d brought in %s over %.1f hours"):format(r.level - 1, ns.Money(net), (lb.secs or 0) / 3600), C.muted)
+      end
+    else
+      local r = p.rec
+      add(date("%A, %b %d", r.t), C.gold)
+      add("Gold at day's end: " .. ns.Money(r.gold, true))
+      add(("Level %d"):format(LevelOn(r.t + 43200)), C.muted)
+      if r.net ~= 0 then add(("Change that day: %s%s"):format(r.net > 0 and "+" or "", ns.Money(r.net)), r.net > 0 and C.mint or C.red) end
+      local gain, spend = ns.DayExtremes(r.day)
+      if gain then add(("Biggest gain: %s, %s"):format(gain[1], ns.Money(gain[2])), C.muted) end
+      if spend then add(("Biggest spend: %s, %s"):format(spend[1], ns.Money(spend[2])), C.muted) end
+    end
+    b.tip = tip
+    b:Show()
+  end
+  -- the cards: change over the range, and the standouts
+  local first, last = pts[1], pts[#pts]
+  local change = last.gold - first.gold
+  if mode == "level" then
+    local steps = max(1, #pts - 1)
+    card1.text:SetText(("From level %d with %s to now with %s\n%s%s since then\nAbout %s per level on average"):format(
+      first.x, ns.Money(first.gold), ns.Money(last.gold), change >= 0 and "+" or "", ns.Money(change), ns.Money(change / steps)))
+    local best, worst
+    for i = 2, #pts do
+      if not pts[i].now then
+        local d = pts[i].gold - pts[i - 1].gold
+        if not best or d > best[2] then best = { pts[i - 1].x, d } end
+        if not worst or d < worst[2] then worst = { pts[i - 1].x, d } end
+      end
+    end
+    card2.text:SetText(best and ("Best level: %d, %s%s\nToughest level: %d, %s%s\nEstimated points are levels from before history was recorded."):format(
+      best[1], best[2] >= 0 and "+" or "", ns.Money(best[2]), worst[1], worst[2] >= 0 and "+" or "", ns.Money(worst[2]))
+      or "Reach another level to compare levels.")
+  else
+    local days = max(1, #pts - 1)
+    card1.text:SetText(("%s: %s\nToday: %s\n%s%s over %d days, about %s a day"):format(
+      date("%b %d", first.x), ns.Money(first.gold), ns.Money(last.gold), change >= 0 and "+" or "", ns.Money(change), days, ns.Money(change / days)))
+    local best, worst
+    for _, p in ipairs(pts) do
+      if not best or p.rec.net > best.rec.net then best = p end
+      if not worst or p.rec.net < worst.rec.net then worst = p end
+    end
+    card2.text:SetText(("Best day: %s, %s%s\nBiggest spending day: %s, %s"):format(
+      date("%b %d", best.x), best.rec.net >= 0 and "+" or "", ns.Money(best.rec.net), date("%b %d", worst.x), ns.Money(worst.rec.net)))
+  end
+end
+
+---------------------------------------------------------------------------
 -- Forecast
 ---------------------------------------------------------------------------
 ns.RegisterPage("Forecast", function(page, f)
-  local head = UI.Heading(f, "Forecast"); head:SetPoint("TOPLEFT", 0, 0)
-  local sub = UI.Text(f, 11, C.muted); sub:SetPoint("LEFT", head, "RIGHT", 12, -1)
-  sub:SetText("Projected gold by level. Training and account purchases (like your mount) step the line down at their level.")
+  -- two views in one place: where your gold is going, and where it has been
+  page.view = "forecast"
+  local fcBtn, hiBtn
+  fcBtn = UI.Button(f, "Forecast", 96, 22, function() page.view = "forecast"; page:Refresh() end)
+  fcBtn:SetPoint("TOPLEFT", 0, 2)
+  hiBtn = UI.Button(f, "History", 96, 22, function() page.view = "history"; page:Refresh() end)
+  hiBtn:SetPoint("LEFT", fcBtn, "RIGHT", 4, 0)
+  local sub = UI.Text(f, 11, C.muted); sub:SetPoint("LEFT", hiBtn, "RIGHT", 12, -1); sub:SetWidth(700)
   local box = Card(f, 918, 330); box:SetPoint("TOPLEFT", 0, -26)
   local chart = CreateFrame("Frame", nil, box); chart:SetPoint("TOPLEFT", 6, -6); chart:SetSize(906, 318)
   local lines, texts = UI.LinePool(chart), TextPool(chart)
@@ -511,7 +705,46 @@ ns.RegisterPage("Forecast", function(page, f)
   local d = Card(f, 458, 140, "Planned costs by level"); d:SetPoint("TOPLEFT", a, "TOPRIGHT", 10, 0)
   d.pool = TextPool(d)
 
+  -- history view: its own chart and cards in the same places
+  local hbox = Card(f, 918, 330); hbox:SetPoint("TOPLEFT", 0, -26)
+  local hchart = CreateFrame("Frame", nil, hbox); hchart:SetPoint("TOPLEFT", 6, -6); hchart:SetSize(906, 318)
+  local hlines, htexts = UI.LinePool(hchart), TextPool(hchart)
+  page.hmode, page.hrange = "level", 30
+  local hm = {}
+  local function HBtn(label, w, fn) local b = UI.Button(hbox, label, w, 20, fn); return b end
+  hm.level = HBtn("By level", 72, function() page.hmode = "level"; page:Refresh() end)
+  hm.level:SetPoint("TOPRIGHT", hbox, "TOPRIGHT", -330, -8)
+  hm.date = HBtn("By date", 72, function() page.hmode = "date"; page:Refresh() end)
+  hm.date:SetPoint("LEFT", hm.level, "RIGHT", 4, 0)
+  local ranges = { { "7d", 7 }, { "30d", 30 }, { "90d", 90 }, { "All", false } }
+  hm.ranges = {}
+  for i, r in ipairs(ranges) do
+    local b = HBtn(r[1], 40, function() page.hrange = r[2]; page:Refresh() end)
+    b:SetPoint("LEFT", i == 1 and hm.date or hm.ranges[i - 1], "RIGHT", i == 1 and 16 or 4, 0)
+    b.range = r[2]
+    hm.ranges[i] = b
+  end
+  local h1 = Card(f, 450, 140, "Over this range"); h1:SetPoint("TOPLEFT", hbox, "BOTTOMLEFT", 0, -10)
+  h1.text = UI.Text(h1, 12, C.text, UI.NUM); h1.text:SetPoint("TOPLEFT", 12, -30); h1.text:SetWidth(426); h1.text:SetJustifyV("TOP")
+  local h2 = Card(f, 458, 140, "Notable"); h2:SetPoint("TOPLEFT", h1, "TOPRIGHT", 10, 0)
+  h2.text = UI.Text(h2, 12, C.text, UI.NUM); h2.text:SetPoint("TOPLEFT", 12, -30); h2.text:SetWidth(434); h2.text:SetJustifyV("TOP")
+  local hover = {}
+
   function page:Refresh()
+    local hist = page.view == "history"
+    fcBtn:SetSelected(not hist); hiBtn:SetSelected(hist)
+    box:SetShown(not hist); a:SetShown(not hist); d:SetShown(not hist)
+    hbox:SetShown(hist); h1:SetShown(hist); h2:SetShown(hist)
+    if hist then
+      sub:SetText("Where your gold has been. Hover a point for the details.")
+      hm.level:SetSelected(page.hmode == "level"); hm.date:SetSelected(page.hmode == "date")
+      for _, b in ipairs(hm.ranges) do
+        b:SetShown(page.hmode == "date"); b:SetSelected(b.range == page.hrange)
+      end
+      ns.DrawHistory(hchart, hlines, htexts, hover, 906, 318, page.hmode, page.hrange or nil, h1, h2)
+      return
+    end
+    sub:SetText("Projected gold by level. Training and account purchases (like your mount) step the line down at their level.")
     local pts, gph, hpl = DrawForecast(chart, lines, texts, 906, 318, 12, false)
     local g, go = ns.GoldPerHour()
     local h, ho = ns.HoursPerLevel()

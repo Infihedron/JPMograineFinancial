@@ -2,7 +2,7 @@ unpack = unpack or table.unpack
 math.atan2 = math.atan2 or math.atan
 local NOW_T = 1794700000
 local NOW_G = 1000.0
-function time() return NOW_T end
+function time(t) if t then return os.time(t) end return NOW_T end
 function SET_TIME(t) NOW_T = t end
 function ADV(sec) NOW_T = NOW_T + sec; NOW_G = NOW_G + sec end
 function GetTime() return NOW_G end

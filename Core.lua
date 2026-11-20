@@ -13,7 +13,7 @@
      Core: saved data, events, error capture, debug log, slash commands, diagnostics. ]]
 
 local ADDON, ns = ...
-ns.VERSION = "1.2.1"
+ns.VERSION = "1.2.2"
 ns.SCHEMA = 4
 ns.NAME = "JP Mograine Financial"
 ns.GOLD_HEX = "e9c86a"
@@ -87,7 +87,7 @@ local ACCOUNT_DEFAULTS = {
 
 local CHAR_DEFAULTS = {
   raw = {}, daily = {}, monthly = {}, goals = {}, debits = { class = {}, prof = {}, pet = {} },
-  played = 0, levels = {}, lastPlan = 0, nextGoalId = 1, acctLog = {}, levelBook = {}, assets = {}, trainerIgnore = {},
+  played = 0, levels = {}, lastPlan = 0, nextGoalId = 1, acctLog = {}, levelBook = {}, levelGold = {}, assets = {}, trainerIgnore = {},
 }
 
 local function Fill(t, d)
@@ -263,7 +263,7 @@ function ns.Report()
   for name in pairs(ns.char.trainerIgnore or {}) do ign[#ign + 1] = name end
   table.sort(ign)
   add("Skipped by you: %s", #ign > 0 and table.concat(ign, ", ") or "none")
-  for _, kind in ipairs({ "class", "pet", "riding", "profession", "empty" }) do
+  for _, kind in ipairs({ "class", "pet", "riding", "weapon", "profession", "empty" }) do
     local td = (ns.acct.trainerDumps or {})[kind]
     if td then
       local cats = {}

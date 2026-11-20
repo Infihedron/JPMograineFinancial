@@ -20,7 +20,7 @@ ns.PRESETS = {
   { kind = "riding60",   name = "Riding at 60",        target = 900 * G,  level = 60, spend = true,
     note = "900g for fast riding with the reputation discount (1,000g without). An epic mount is reported at about 200g more; raise the target if you want one." },
   { kind = "training",   name = "Training reserve",    auto = true,
-    note = "Fills itself from your class trainer's prices for your next six levels." },
+    note = "Fills itself from your class trainer's prices for your next training session: what you can learn now, or the next level with new skills once that is bought." },
   { kind = "stable",     name = "Stable slot",         target = 5 * G,
     note = "The extra hunter stable slot: 5g in WoW: Forever, with no reputation discount." },
   { kind = "profession", name = "Profession training", target = nil,
@@ -105,12 +105,26 @@ function ns.Debits()
   return out
 end
 
+-- Your next visit to the trainer: anything you could learn now (including skills
+-- from earlier levels still unlearned), or, when that is all bought, the next level
+-- that has something to learn. Returns cost and that level (nil when nothing is known).
+function ns.NextTraining()
+  local cur, deb = UnitLevel("player"), ns.Debits()
+  local now, nextLvl = 0, nil
+  for lvl, cost in pairs(deb) do
+    if cost > 0 then
+      if lvl <= cur then now = now + cost
+      elseif not nextLvl or lvl < nextLvl then nextLvl = lvl end
+    end
+  end
+  if now > 0 then return now, cur end
+  if nextLvl then return deb[nextLvl], nextLvl end
+  return 0, nil
+end
+
 function ns.GoalTarget(g)
   if g.kind == "training" then
-    local cur, total = UnitLevel("player"), 0
-    for lvl, cost in pairs(ns.Debits()) do
-      if lvl >= cur and lvl <= cur + 6 then total = total + cost end
-    end
+    local total = ns.NextTraining()
     return total
   end
   return g.target or 0
@@ -316,6 +330,27 @@ end
 -- What kind of trainer is open: "profession", "pet" or "class".
 -- The game reports pet trainers like class trainers, so look at the NPC's title
 -- ("<Pet Trainer>") and at what is for sale.
+-- Weapon masters sell weapon skills with no rank and no level requirement. They are
+-- one-off purchases, never your class training plan.
+local WEAPON_SKILLS = {}
+for _, w in ipairs({ "Bows", "Crossbows", "Daggers", "Fist Weapons", "Guns", "One-Handed Axes", "One-Handed Maces",
+  "One-Handed Swords", "Two-Handed Axes", "Two-Handed Maces", "Two-Handed Swords", "Polearms", "Staves", "Thrown", "Wands" }) do
+  WEAPON_SKILLS[w] = true
+end
+ns.WEAPON_SKILLS = WEAPON_SKILLS
+
+function ns.IsWeaponList()
+  local weapon, all = 0, 0
+  for i = 1, (GetNumTrainerServices and GetNumTrainerServices() or 0) do
+    local name = GetTrainerServiceInfo(i)
+    if type(name) == "string" and name ~= "" then
+      all = all + 1
+      if WEAPON_SKILLS[name] then weapon = weapon + 1 end
+    end
+  end
+  return weapon > 0 and weapon == all
+end
+
 local PET_SKILLS = { ["Great Stamina"] = true, ["Natural Armor"] = true, ["Growl"] = true,
   ["Arcane Resistance"] = true, ["Fire Resistance"] = true, ["Frost Resistance"] = true,
   ["Nature Resistance"] = true, ["Shadow Resistance"] = true }
@@ -331,6 +366,7 @@ function ns.TrainerKind()
     end
   end
   if riding > 0 and riding == all then return "riding" end
+  if ns.IsWeaponList() then return "weapon" end
   if C_TooltipInfo and C_TooltipInfo.GetUnit then
     local ok, data = pcall(C_TooltipInfo.GetUnit, "npc")
     for _, line in ipairs(ok and data and data.lines or {}) do
@@ -353,12 +389,15 @@ local scanning, lastScan = false, 0
 local function ScanTrainer()
   if scanning or not GetNumTrainerServices or not GetTrainerServiceLevelReq then return end
   scanning = true
-  local changed = false
+  local restore = nil   -- the value that puts the filter back, if we changed it
   if GetTrainerServiceTypeFilter and SetTrainerServiceTypeFilter then
     local f = GetTrainerServiceTypeFilter("unavailable")
     if not f or f == 0 then
-      SetTrainerServiceTypeFilter("unavailable", 1)   -- show future skills, restored below
-      changed = true
+      -- show future skills, restored below; Forever reports this filter as true/false
+      local on, off = 1, 0
+      if type(f) == "boolean" then on, off = true, false end
+      SetTrainerServiceTypeFilter("unavailable", on)
+      restore = off
     end
   end
   local kind = ns.TrainerKind()
@@ -379,7 +418,7 @@ local function ScanTrainer()
 
   if n == 0 then
     -- nothing listed (a pet trainer, or the list has not loaded): change nothing
-    if changed then SetTrainerServiceTypeFilter("unavailable", 0) end
+    if restore ~= nil then SetTrainerServiceTypeFilter("unavailable", restore) end
     scanning = false
     lastScan = GetTime()
     dump.kind = kind
@@ -458,7 +497,7 @@ local function ScanTrainer()
     end
   end
   dump.counted = count
-  if changed then SetTrainerServiceTypeFilter("unavailable", 0) end
+  if restore ~= nil then SetTrainerServiceTypeFilter("unavailable", restore) end
   scanning = false
   lastScan = GetTime()
   dumps[kind] = dump
@@ -484,12 +523,40 @@ local function ScanTrainer()
     d.prof, d.profAt = byLevel, time()
   elseif kind == "pet" then
     d.pet, d.petAt = byLevel, time()
+  elseif kind == "weapon" then
+    -- a weapon master: nothing to plan
   else
+    -- If this list shows nothing above your level (the game hid future skills),
+    -- keep the future levels from the last scan instead of erasing them.
+    local future = false
+    for lvl in pairs(byLevel) do if lvl > cur then future = true end end
+    if not future then
+      for lvl, cost in pairs(d.class or {}) do
+        if lvl > cur then byLevel[lvl] = cost end
+      end
+    end
     d.class, d.scannedAt, d.scannedLevel = byLevel, time(), cur
   end
   ns.Log("trainer scan (%s): %d services, %d future costs", kind, n, count)
   ns.Fire("JPMF_GOALS_CHANGED")
 end
+-- 1.2.1 and earlier filed a weapon master's list as class training, replacing the
+-- real plan. If this character's class plan came from one, move it aside so the
+-- next class trainer visit plans properly.
+ns.On("PLAYER_LOGIN", function()
+  local dumps, d = ns.acct.trainerDumps, ns.char and ns.char.debits
+  local td = dumps and dumps.class
+  if not (td and d and td.sample and #td.sample > 0) then return end
+  for _, line in ipairs(td.sample) do
+    if not ns.WEAPON_SKILLS[line:match("^(.-) ;") or ""] then return end
+  end
+  dumps.weapon, dumps.class = td, nil
+  if d.scannedAt and math.abs(d.scannedAt - td.t) < 120 then
+    d.class, d.scannedAt, d.scannedLevel = {}, nil, nil
+    ns.Say("Your training plan was overwritten by a weapon master's list. Visit your class trainer once and it is planned again.")
+  end
+end)
+
 -- scan right away, again a moment later, and whenever the list changes
 -- (the first look at a trainer often comes back empty while it loads)
 local updates = 0

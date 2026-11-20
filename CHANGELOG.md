@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.2 (2026-11-20)
+
+**History**
+- The Forecast tab has a History view beside it. Look back at your gold at each level, or day by day over the last 7, 30 or 90 days or all of it. Hover any point for the details: your gold, your level, that day's change and its biggest gain and spend, or what a level brought in and how long it took.
+- Cards under the chart show the change over the range and your best and toughest day or level.
+- The forecast now starts from your last two levels of real history, so you can see where the line comes from.
+- Gold is recorded as you reach each level and at the end of each day. Levels from before 1.2.2 are worked back from your per-level books and marked as estimated.
+
+**Training reserve**
+- The training reserve now saves for your next training session only: what you can learn right now, or, once that is bought, the next level with new skills. It shows which level that is.
+- Fixed: a weapon master (for example, buying Thrown) was read as your class trainer and replaced your whole training plan with that one skill, so the reserve showed a few silver. Weapon masters no longer touch your plan. If this happened to you, the bad plan is cleared at login; visit your class trainer once to rebuild it.
+- A class trainer visit that only lists what you can learn now (future skills hidden) no longer erases the levels you had already planned.
+
 ## 1.2.1 (2026-11-17)
 
 - Fixed: visiting a riding trainer replaced your class training plan with riding prices, so your mount was counted twice (once as training, once in your riding account) and your real class training dropped out. Riding trainers are now recognized on their own. If this happened to you, the bad plan is cleared; visit your class trainer once to rebuild it.

@@ -183,11 +183,18 @@ function ns.Record(amount, cat, note)
   c.raw[#c.raw + 1] = { t = t, a = amount, c = cat, z = GetRealZoneText and GetRealZoneText() or "" }
   Bump(c.daily, DayKey(t), cat, amount)
   Bump(c.monthly, MonthKey(t), cat, amount)
+  c.daily[DayKey(t)]._close = GetMoney()   -- gold at the end of the day, for history
   -- by character level: what you earned and spent while at this level
-  if cat ~= "Unreconciled" and cat ~= "Transfers" then
+  -- (adjustments and transfers are kept apart, only so gold history adds up)
+  do
     local L = UnitLevel("player") or 0
     local lb = c.levelBook[L]
     if not lb then lb = { secs = 0, cats = {} }; c.levelBook[L] = lb end
+    if cat == "Unreconciled" or cat == "Transfers" then lb.adj = (lb.adj or 0) + amount end
+  end
+  if cat ~= "Unreconciled" and cat ~= "Transfers" then
+    local L = UnitLevel("player") or 0
+    local lb = c.levelBook[L]
     local e = lb.cats[cat]
     if not e then e = { 0, 0 }; lb.cats[cat] = e end
     if amount >= 0 then e[1] = e[1] + amount else e[2] = e[2] + amount end
@@ -303,6 +310,7 @@ ns.On("PLAYER_LOGOUT", function() ns.Safe(Tick); ns.UpdateHousehold() end)
 ns.On("PLAYER_LEVEL_UP", function(_, level)
   ns.Safe(Tick)
   ns.char.levels[level] = ns.char.played
+  ns.char.levelGold[level] = { g = GetMoney(), t = time() }
   ns.Log("level %d reached at %.1f hours played", level, ns.char.played / 3600)
 end)
 
@@ -518,5 +526,97 @@ function ns.ExportCSV()
     out[#out + 1] = Row(r.level, r.income, r.costs, r.other, r.net, ("%.2f"):format(r.secs / 3600))
   end
   return table.concat(out, "\n")
+end
+
+---------------------------------------------------------------------------
+-- Gold history
+---------------------------------------------------------------------------
+local function DayNet(day)
+  local n = 0
+  for cat, e in pairs(day) do
+    if cat:sub(1, 1) ~= "_" then n = n + e[1] + e[2] end
+  end
+  return n
+end
+
+-- Your gold at the end of each day, oldest first, back to `days` days ago (nil: all
+-- kept days). Days with a saved closing balance use it; older ones are worked back
+-- from today using each day's recorded changes. Quiet days carry the last balance.
+function ns.DailyHistory(days)
+  local c = ns.char
+  local keys = {}
+  for k in pairs(c.daily) do keys[#keys + 1] = k end
+  table.sort(keys)
+  if #keys == 0 then return {} end
+  local close, gold = {}, GetMoney()
+  -- walk backwards: a day's close is the next day's close minus the next day's net
+  for i = #keys, 1, -1 do
+    local k, d = keys[i], c.daily[keys[i]]
+    if i == #keys then
+      close[k] = (k == date("%Y-%m-%d")) and gold or (d._close or gold)
+    else
+      local nk = keys[i + 1]
+      close[k] = d._close or (close[nk] - DayNet(c.daily[nk]))
+    end
+  end
+  local first = keys[1]
+  if days then
+    local cut = date("%Y-%m-%d", time() - days * 86400)
+    if cut > first then first = cut end
+  end
+  -- every calendar day from first to today
+  local out, t, last = {}, nil, nil
+  local y, m, dd = first:match("(%d+)-(%d+)-(%d+)")
+  t = time({ year = tonumber(y), month = tonumber(m), day = tonumber(dd), hour = 12 })
+  local today = date("%Y-%m-%d")
+  for k in pairs(close) do if k < first and (not last or k > last) then last = k end end
+  last = last and close[last] or nil
+  while true do
+    local k = date("%Y-%m-%d", t)
+    if close[k] then last = close[k] end
+    if last then out[#out + 1] = { day = k, t = t, gold = last, net = c.daily[k] and DayNet(c.daily[k]) or 0 } end
+    if k >= today then break end
+    t = t + 86400
+  end
+  return out
+end
+
+-- Biggest gain and biggest spend in one day's books.
+function ns.DayExtremes(dayKey)
+  local d, gain, spend = ns.char.daily[dayKey], nil, nil
+  for cat, e in pairs(d or {}) do
+    if cat:sub(1, 1) ~= "_" then
+      if e[1] > 0 and (not gain or e[1] > gain[2]) then gain = { cat, e[1] } end
+      if e[2] < 0 and (not spend or e[2] < spend[2]) then spend = { cat, e[2] } end
+    end
+  end
+  return gain, spend
+end
+
+-- Your gold as you reached each level, oldest first. Levels reached since 1.2.2
+-- are recorded; earlier ones are worked back from the per-level books (estimated).
+function ns.LevelHistory()
+  local c, cur = ns.char, UnitLevel("player")
+  local out, gold = {}, GetMoney()
+  -- start of the current level = now minus what changed during it, and so on back
+  local startGold = {}
+  local g = gold
+  for L = cur, 1, -1 do
+    local lb = c.levelBook[L]
+    if not lb then break end
+    local change = lb.adj or 0
+    for _, e in pairs(lb.cats or {}) do change = change + e[1] + e[2] end
+    g = g - change
+    startGold[L] = g
+  end
+  for L = 1, cur do
+    local rec = c.levelGold[L]
+    if rec then
+      out[#out + 1] = { level = L, gold = rec.g, t = rec.t, estimated = false }
+    elseif startGold[L] and L > 1 and c.levelBook[L - 1] then
+      out[#out + 1] = { level = L, gold = startGold[L], estimated = true }
+    end
+  end
+  return out
 end
 
