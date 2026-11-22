@@ -496,8 +496,8 @@ ns.RegisterPage("Accounts", function(page, f)
         if g.kind == "training" then
           local _, lvl = ns.NextTraining()
           note[#note + 1] = not lvl and "pays your training"
-            or lvl <= UnitLevel("player") and "next session: now, at your trainer"
-            or ("next session: level %d"):format(lvl)
+            or lvl <= UnitLevel("player") and "train now"
+            or ("for level %d"):format(lvl)
         elseif g.level then note[#note + 1] = "spent at level " .. g.level end
         r.note:SetText(#note > 0 and table.concat(note, ", ") or "Savings")
         r.bar:Set(t > 0 and s / t or (s > 0 and 1 or 0), col)
