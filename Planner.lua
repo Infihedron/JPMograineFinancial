@@ -98,6 +98,9 @@ function ns.Debits()
   for lvl, cost in pairs(c.debits.class or {}) do out[lvl] = (out[lvl] or 0) + cost end
   if s.includeProfTraining then
     for lvl, cost in pairs(c.debits.prof or {}) do out[lvl] = (out[lvl] or 0) + cost end
+    for _, pr in pairs(c.debits.profs or {}) do
+      for lvl, cost in pairs(pr.costs or {}) do out[lvl] = (out[lvl] or 0) + cost end
+    end
   end
   if s.includePetTraining ~= false then
     for lvl, cost in pairs(c.debits.pet or {}) do out[lvl] = (out[lvl] or 0) + cost end
@@ -238,7 +241,9 @@ ns.On("JPMF_LEDGER_CHANGED", function(_, amount, cat)
         break
       end
     end
-  elseif amount < 0 and type(cat) == "string" and cat:find("training$") then
+  elseif amount < 0 and (cat == "Class training" or cat == "Pet training"
+      or (cat == "Profession training" and ns.acct.settings.includeProfTraining)) then
+    -- the reserve pays for the training it saves for; weapon skills are paid from Free
     for _, g in ipairs(ns.char.goals) do
       if g.kind == "training" and (g.balance or 0) > 0 then
         local pay = min(-amount, g.balance)
@@ -354,35 +359,64 @@ end
 local PET_SKILLS = { ["Great Stamina"] = true, ["Natural Armor"] = true, ["Growl"] = true,
   ["Arcane Resistance"] = true, ["Fire Resistance"] = true, ["Frost Resistance"] = true,
   ["Nature Resistance"] = true, ["Shadow Resistance"] = true }
+-- The trainer's title under its name ("Hunter Trainer", "Weapon Master",
+-- "Leatherworking Trainer"), when the game will show it to us.
+function ns.TrainerTitle()
+  if not (C_TooltipInfo and C_TooltipInfo.GetUnit) then return nil end
+  local ok, data = pcall(C_TooltipInfo.GetUnit, "npc")
+  for i, line in ipairs(ok and data and data.lines or {}) do
+    local t = line.leftText
+    if i > 1 and type(t) == "string" and (t:find("Trainer") or t:find("Master") or t:find("Instructor")) then return t end
+  end
+end
+
+-- What kind of trainer is open, and for professions which one.
+-- Only a trainer that is plainly your class's own can change your class plan;
+-- anything unrecognized is recorded but plans nothing.
 function ns.TrainerKind()
-  if IsTradeskillTrainer and IsTradeskillTrainer() then return "profession" end
+  local n = GetNumTrainerServices and GetNumTrainerServices() or 0
+  local names = {}
+  for i = 1, n do
+    local name = GetTrainerServiceInfo(i)
+    if type(name) == "string" and name ~= "" then names[#names + 1] = { i = i, name = name } end
+  end
+  local title = ns.TrainerTitle()
+  if IsTradeskillTrainer and IsTradeskillTrainer() then
+    local prof
+    if GetTrainerServiceSkillLine then
+      for _, e in ipairs(names) do
+        local line = GetTrainerServiceSkillLine(e.i)
+        if type(line) == "string" and line ~= "" then prof = line; break end
+      end
+    end
+    prof = prof or (title and title:gsub("%s*Trainer$", ""):gsub("^Master%s+", ""):gsub("^Expert%s+", "")) or "Profession"
+    return "profession", prof
+  end
   -- a riding trainer lists only riding skills; those are your mount, not class training
-  local riding, all = 0, 0
-  for i = 1, (GetNumTrainerServices and GetNumTrainerServices() or 0) do
-    local name = GetTrainerServiceInfo(i)
-    if type(name) == "string" and name ~= "" then
-      all = all + 1
-      if name:find("Riding$") then riding = riding + 1 end
+  local riding, pet = 0, 0
+  for _, e in ipairs(names) do
+    if e.name:find("Riding$") then riding = riding + 1 end
+    if PET_SKILLS[e.name] then pet = pet + 1 end
+  end
+  if riding > 0 and riding == #names then return "riding" end
+  if ns.IsWeaponList() or (title and title:find("Weapon Master")) then return "weapon" end
+  if (title and title:find("Pet Trainer")) or (#names > 0 and pet * 2 >= #names) then return "pet" end
+  -- class trainer: its title names your class, or (no title) it sells ranked skills
+  -- or skills you already know
+  local className = UnitClass and UnitClass("player")
+  if title then
+    if className and title:find(className, 1, true) then return "class" end
+    return "other", title
+  end
+  local known = KnownSpells()
+  for _, e in ipairs(names) do
+    if known[e.name] then return "class" end
+    local v = { GetTrainerServiceInfo(e.i) }
+    for k = 2, #v do
+      if type(v[k]) == "string" and v[k]:match("%d+%s*$") and v[k]:find("Rank") then return "class" end
     end
   end
-  if riding > 0 and riding == all then return "riding" end
-  if ns.IsWeaponList() then return "weapon" end
-  if C_TooltipInfo and C_TooltipInfo.GetUnit then
-    local ok, data = pcall(C_TooltipInfo.GetUnit, "npc")
-    for _, line in ipairs(ok and data and data.lines or {}) do
-      if type(line.leftText) == "string" and line.leftText:find("Pet Trainer") then return "pet" end
-    end
-  end
-  local pet, total = 0, 0
-  for i = 1, (GetNumTrainerServices and GetNumTrainerServices() or 0) do
-    local name = GetTrainerServiceInfo(i)
-    if name then
-      total = total + 1
-      if PET_SKILLS[name] then pet = pet + 1 end
-    end
-  end
-  if total > 0 and pet * 2 >= total then return "pet" end
-  return "class"
+  return "other"
 end
 
 local scanning, lastScan = false, 0
@@ -400,7 +434,7 @@ local function ScanTrainer()
       restore = off
     end
   end
-  local kind = ns.TrainerKind()
+  local kind, which = ns.TrainerKind()
   local isProf = kind == "profession"
   local cur = UnitLevel("player")
   local n = GetNumTrainerServices() or 0
@@ -500,6 +534,7 @@ local function ScanTrainer()
   if restore ~= nil then SetTrainerServiceTypeFilter("unavailable", restore) end
   scanning = false
   lastScan = GetTime()
+  dump.which = which
   dumps[kind] = dump
   -- class, pet and profession scans are kept apart; "scannedAt" is the class trainer's.
   -- (Pet skill level requirements are your pet's level, close enough to yours to plan by.)
@@ -520,11 +555,21 @@ local function ScanTrainer()
       end
     end
   elseif kind == "profession" then
-    d.prof, d.profAt = byLevel, time()
+    -- each profession keeps its own plan, so skinning never replaces leatherworking
+    d.profs = d.profs or {}
+    d.profs[which] = { costs = byLevel, at = time() }
+    d.prof, d.profAt = nil, time()
   elseif kind == "pet" then
     d.pet, d.petAt = byLevel, time()
   elseif kind == "weapon" then
-    -- a weapon master: nothing to plan
+    -- weapon skills are optional one-off purchases: recorded, never planned
+    local skills = {}
+    for _, e in ipairs(list) do
+      if type(e.name) == "string" and e.cat ~= "used" and e.cost > 0 then skills[e.name] = e.cost end
+    end
+    d.weapon, d.weaponAt = skills, time()
+  elseif kind == "other" then
+    -- not a trainer we know how to plan for: recorded in the report only
   else
     -- If this list shows nothing above your level (the game hid future skills),
     -- keep the future levels from the last scan instead of erasing them.
@@ -719,7 +764,7 @@ function ns.Statement(days)
   table.sort(cats, function(a, b) return (a.p + a.n) > (b.p + b.n) end)
   local leaks = {}
   for _, e in ipairs(cats) do
-    if e.n < 0 and e.cat ~= "Class training" and e.cat ~= "Pet training" and e.cat ~= "Unreconciled" then leaks[#leaks + 1] = e end
+    if e.n < 0 and not e.cat:find("training$") and e.cat ~= "Unreconciled" then leaks[#leaks + 1] = e end
   end
   table.sort(leaks, function(a, b) return a.n < b.n end)
   return { days = days, cats = cats, income = inc, spend = out, net = inc + out,

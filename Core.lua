@@ -13,7 +13,7 @@
      Core: saved data, events, error capture, debug log, slash commands, diagnostics. ]]
 
 local ADDON, ns = ...
-ns.VERSION = "1.2.2"
+ns.VERSION = "1.2.3"
 ns.SCHEMA = 4
 ns.NAME = "JP Mograine Financial"
 ns.GOLD_HEX = "e9c86a"
@@ -258,19 +258,32 @@ function ns.Report()
   table.sort(rid)
   add("Riding trainer scan: %s / %s", d.ridingAt and date("%m-%d %H:%M", d.ridingAt) or "never",
     #rid > 0 and table.concat(rid, ", ") or "none")
-  add("Profession trainer scan: %s / %s", d.profAt and date("%m-%d %H:%M", d.profAt) or "never", Levels(d.prof))
+  if d.prof then add("Profession trainer scan (from before 1.2.3): %s", Levels(d.prof)) end
+  local profNames = {}
+  for name in pairs(d.profs or {}) do profNames[#profNames + 1] = name end
+  table.sort(profNames)
+  for _, name in ipairs(profNames) do
+    local pr = d.profs[name]
+    add("%s trainer scan: %s / %s", name, pr.at and date("%m-%d %H:%M", pr.at) or "never", Levels(pr.costs))
+  end
+  if #profNames == 0 and not d.prof then add("Profession trainer scan: never / none") end
+  local wpn = {}
+  for name, cost in pairs(d.weapon or {}) do wpn[#wpn + 1] = name .. "=" .. ns.Money(cost) end
+  table.sort(wpn)
+  add("Weapon master scan (not planned): %s / %s", d.weaponAt and date("%m-%d %H:%M", d.weaponAt) or "never",
+    #wpn > 0 and table.concat(wpn, ", ") or "none")
   local ign = {}
   for name in pairs(ns.char.trainerIgnore or {}) do ign[#ign + 1] = name end
   table.sort(ign)
   add("Skipped by you: %s", #ign > 0 and table.concat(ign, ", ") or "none")
-  for _, kind in ipairs({ "class", "pet", "riding", "weapon", "profession", "empty" }) do
+  for _, kind in ipairs({ "class", "pet", "riding", "weapon", "profession", "other", "empty" }) do
     local td = (ns.acct.trainerDumps or {})[kind]
     if td then
       local cats = {}
       for k, c in pairs(td.cats or {}) do cats[#cats + 1] = k .. "=" .. c end
       table.sort(cats)
       add("Last %s trainer: %s at %s, %d services, %s counted, spellbook %s, requirement info %s, filter=%s, status: %s",
-        kind, tostring(td.npc), date("%m-%d %H:%M", td.t), td.n or 0, tostring(td.counted or 0),
+        kind, tostring(td.npc) .. (td.which and (" (" .. td.which .. ")") or ""), date("%m-%d %H:%M", td.t), td.n or 0, tostring(td.counted or 0),
         tostring(td.spellbook), tostring(td.reqAPI), tostring(td.filter), #cats > 0 and table.concat(cats, ", ") or "none")
       if kind ~= "empty" then
         add("  talent-locked, left out: %s", #(td.skipped or {}) > 0 and table.concat(td.skipped, ", ") or "none")

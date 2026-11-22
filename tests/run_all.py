@@ -16,7 +16,7 @@ except ImportError:
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ADDON = os.path.dirname(HERE) + os.sep
-SCRIPTS = ["run.lua", "fresh.lua", "accounts.lua", "extras.lua", "levels.lua", "riding.lua", "training.lua"]
+SCRIPTS = ["run.lua", "fresh.lua", "accounts.lua", "extras.lua", "levels.lua", "riding.lua", "training.lua", "trainers.lua"]
 
 
 def run(script, verbose):

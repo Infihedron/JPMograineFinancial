@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.3 (2026-11-21)
+
+**Every kind of training is tracked on its own, and none can overwrite another**
+- Trainers are identified by their title ("Hunter Trainer", "Weapon Master", "Leatherworking Trainer"). Only your own class's trainer can change your class training plan. Another class's trainer, a portal trainer or anything unrecognized is noted in /jpm report and changes nothing.
+- Each profession keeps its own plan, so visiting your skinning trainer no longer replaces your leatherworking plan. /jpm report lists every profession you have scanned.
+- Weapon masters are recorded too: /jpm report lists the weapon skills you can still learn and their prices. They are optional, so they are never planned.
+- New Weapon training category in the Ledger. Weapon skills are paid from Free, not your training reserve, which stays for the training it is saving for. Profession training is paid from the reserve only when you include it in the forecast.
+- The training account's note is shorter ("train now", "for level 38") and fits on one line.
+
 ## 1.2.2 (2026-11-20)
 
 **History**

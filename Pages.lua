@@ -984,7 +984,7 @@ local function StatementText()
   add("SPENDING")
   for _, e in ipairs(st.leaks) do add(("  %-22s %s"):format(e.cat, ns.Money(-e.n))) end
   for _, e in ipairs(st.cats) do
-    if e.n < 0 and (e.cat == "Class training" or e.cat == "Pet training") then add(("  %-22s %s"):format(e.cat, ns.Money(-e.n))) end
+    if e.n < 0 and e.cat:find("training$") then add(("  %-22s %s"):format(e.cat, ns.Money(-e.n))) end
   end
   add("")
   add(("Net for the week: %s over %.1f hours played"):format(ns.Money(st.net), st.played / 3600))
