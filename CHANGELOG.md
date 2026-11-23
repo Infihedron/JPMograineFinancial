@@ -9,6 +9,12 @@
 - New Weapon training category in the Ledger. Weapon skills are paid from Free, not your training reserve, which stays for the training it is saving for. Profession training is paid from the reserve only when you include it in the forecast.
 - The training account's note is shorter ("train now", "for level 38") and fits on one line.
 
+**Forecast chart cleanup**
+- The "now" marker sits at your current level again instead of at the left edge.
+- Account labels no longer print on top of each other when two goal lines are close; they alternate sides.
+- The shortfall warning stays inside the chart, next to the drop it describes.
+- History points on the forecast show whole gold ("47g") so they don't crowd the line.
+
 ## 1.2.2 (2026-11-20)
 
 **History**

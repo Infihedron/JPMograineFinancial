@@ -124,9 +124,11 @@ local function DrawForecast(holder, lines, texts, w, h, levels, compact)
     local nx, ny
     if hist[i + 1] then nx, ny = XL(hist[i + 1].level), Y(hist[i + 1].gold) else nx, ny = X(cur), Y(pts[1].peak) end
     lines:Line(XL(h.level), Y(h.gold), nx, ny, C.text, 2)
-    local tick = texts:Get(9, C.muted, UI.NUM)
-    tick:SetPoint("BOTTOM", holder, "BOTTOMLEFT", XL(h.level), Y(h.gold) + 4)
-    tick:SetText(ns.Money(h.gold))
+    if h.level < cur or X(cur) - XL(h.level) > 40 then
+      local tick = texts:Get(9, C.muted, UI.NUM)
+      tick:SetPoint("BOTTOM", holder, "BOTTOMLEFT", XL(h.level), Y(h.gold) + 5)
+      tick:SetText(floor(h.gold / 10000) .. "g")
+    end
   end
   if #hist > 0 and not compact then
     local lab = texts:Get(10, C.muted)
@@ -134,11 +136,24 @@ local function DrawForecast(holder, lines, texts, w, h, levels, compact)
     lab:SetText("your last levels")
   end
   -- goal lines
+  -- labels alternate sides when lines are close, and step up if still crowded
+  local lastY = { left = -100, right = -100 }
   for _, g in ipairs(goals) do
     if g.amount <= ymax then
       UI.Dashed(lines, padL, Y(g.amount), padL + cw, Y(g.amount), C.goldDim, 1.5, 6, 5)
       local t = texts:Get(compact and 10 or 11, C.gold)
-      t:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", padL + 4, Y(g.amount) + 2)
+      local ly, side = Y(g.amount) + 2, "left"
+      if ly - lastY.left < 14 then side = "right" end
+      if side == "right" and ly - lastY.right < 14 then
+        side = lastY.left <= lastY.right and "left" or "right"
+        ly = lastY[side] + 14
+      end
+      lastY[side] = ly
+      if side == "left" then
+        t:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", padL + 4, ly)
+      else
+        t:SetPoint("BOTTOMRIGHT", holder, "BOTTOMLEFT", padL + cw - 4, ly)
+      end
       t:SetText(g.name .. " \194\183 " .. ns.Money(g.own))
       local eta = ns.ArrivalLevel(g.amount, pts)
       if eta and eta <= L1 then
@@ -161,7 +176,7 @@ local function DrawForecast(holder, lines, texts, w, h, levels, compact)
       end
     end
   end
-  if pts[1].debit > 0 then lines:Line(X(L0), Y(pts[1].peak), X(L0), Y(pts[1].after), C.red, 2) end
+  if pts[1].debit > 0 then lines:Line(X(cur), Y(pts[1].peak), X(cur), Y(pts[1].after), C.red, 2) end
   -- "now" marker: a drawn dot (the game font has no circle glyph)
   local dot = nowDots[holder]
   if not dot then
@@ -171,15 +186,23 @@ local function DrawForecast(holder, lines, texts, w, h, levels, compact)
     nowDots[holder] = dot
   end
   dot:ClearAllPoints()
-  dot:SetPoint("CENTER", holder, "BOTTOMLEFT", X(L0), Y(pts[1].peak))
+  dot:SetPoint("CENTER", holder, "BOTTOMLEFT", X(cur), Y(pts[1].peak))
   dot:Show()
   local nowLabel = texts:Get(10, C.mint)
-  nowLabel:SetPoint("TOP", holder, "BOTTOMLEFT", X(L0) + 14, Y(pts[1].peak) - 8)
+  nowLabel:SetPoint("TOP", holder, "BOTTOMLEFT", X(cur), Y(pts[1].peak) - 8)
   nowLabel:SetText("now")
   if shortLevel then
     local warn = texts:Get(compact and 11 or 12.5, C.red)
-    warn:SetPoint("BOTTOMRIGHT", holder, "BOTTOMLEFT", X(shortLevel) - 8, padB + 8)
     warn:SetText(("Short by about %s at level %d"):format(ns.Money(-short), shortLevel))
+    -- right of the drop (where the line sits at zero) if it fits, otherwise left of it;
+    -- high enough to clear the goal labels that sit on the left
+    local wide = warn.GetStringWidth and warn:GetStringWidth() or 0
+    local wy = padB + 30
+    if X(shortLevel) + 8 + wide <= padL + cw - 4 then
+      warn:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", X(shortLevel) + 8, wy)
+    else
+      warn:SetPoint("BOTTOMRIGHT", holder, "BOTTOMLEFT", max(X(shortLevel) - 8, padL + 4 + wide), wy)
+    end
   end
   return pts, gph, hpl
 end
