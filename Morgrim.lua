@@ -8,15 +8,30 @@ local C = UI.C
 
 local win, steps, step
 
-local function SetPortrait()
+-- The game only draws a creature it has details for. Those arrive from the server a
+-- moment after we ask, so look again a few times and show the coin until he appears.
+local function Loaded(m)
+  local ok, id = pcall(m.GetModelFileID, m)
+  if ok and id and id ~= 0 then return true end
+  ok, id = pcall(m.GetModel, m)
+  return ok and type(id) == "string" and id ~= ""
+end
+
+local function SetPortrait(tries)
   local m = win.model
   local id = ns.acct.settings.morgrimCreature
   local ok = id and pcall(m.SetCreature, m, id)
-  win.fallback:SetShown(not ok)
+  local shown = ok and Loaded(m)
+  win.fallback:SetShown(not shown)
   m:SetShown(ok and true or false)
-  if ok then
+  m:SetAlpha(shown and 1 or 0)
+  if shown then
     pcall(m.SetPortraitZoom, m, 0.75)
     pcall(m.SetCamDistanceScale, m, 1.1)
+  elseif ok and (tries or 0) < 6 and C_Timer then
+    C_Timer.After(0.5 + (tries or 0) * 0.5, function()
+      if win and win:IsShown() then SetPortrait((tries or 0) + 1) end
+    end)
   end
 end
 

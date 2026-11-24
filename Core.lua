@@ -13,7 +13,7 @@
      Core: saved data, events, error capture, debug log, slash commands, diagnostics. ]]
 
 local ADDON, ns = ...
-ns.VERSION = "1.2.3"
+ns.VERSION = "1.2.4"
 ns.SCHEMA = 4
 ns.NAME = "JP Mograine Financial"
 ns.GOLD_HEX = "e9c86a"
@@ -253,6 +253,7 @@ function ns.Report()
   end
   add("Class trainer scan: %s / %s", d.scannedAt and date("%m-%d %H:%M", d.scannedAt) or "never", Levels(d.class))
   add("Pet trainer scan: %s / %s", d.petAt and date("%m-%d %H:%M", d.petAt) or "never", Levels(d.pet))
+  if d.petSuspect then add("  Pet prices read as a few copper, so pet training is not planned. The cost returns below show what the game sent.") end
   local rid = {}
   for name, cost in pairs(d.riding or {}) do rid[#rid + 1] = name .. "=" .. ns.Money(cost) end
   table.sort(rid)

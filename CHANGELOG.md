@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.4 (2026-11-24)
+
+- Fixed: the training reserve could target a few copper ("Train now, funded at 62c") and Upcoming costs showed "Due now 62c". Pet trainer prices were being read as a few copper each, which is not what pet skills cost. Those prices are no longer planned, and the bad saved values are cleared at login. Your reserve now saves for your next class training. /jpm report shows exactly what the pet trainer sent, so real pet prices can be planned once confirmed.
+- Fixed: Morgrim Stanley's portrait could stay blank. The game sends his details a moment after the window asks, so the portrait now keeps trying for a few seconds and shows a coin until he appears.
+
 ## 1.2.3 (2026-11-21)
 
 **Every kind of training is tracked on its own, and none can overwrite another**

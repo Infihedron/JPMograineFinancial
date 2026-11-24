@@ -33,6 +33,9 @@ k = visit("Riding Trainer", { {"Apprentice Riding","unavailable",900000,40,nil,"
 assert(k == "riding" and d.class[40] == 50000)
 k = visit("Pet Trainer", { {"Great Stamina","unavailable",25,36,nil,"Rank 6"} })
 assert(k == "pet" and d.class[38] == 32000)
+assert(d.petSuspect and next(d.pet) == nil, "copper pet prices are not planned")
+k = visit("Pet Trainer", { {"Great Stamina","unavailable",4500,40,nil,"Rank 6"} })
+assert(d.pet[40] == 4500 and not d.petSuspect, "real pet prices are planned")
 print("weapon, portal, other class, riding and pet trainers left the class plan alone")
 
 -- professions are kept apart

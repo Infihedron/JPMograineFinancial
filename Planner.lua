@@ -475,8 +475,14 @@ local function ScanTrainer()
       for k = 1, 6 do parts[k] = tostring(v[k]) end
       dump.raw[#dump.raw + 1] = table.concat(parts, " ; ")
     end
-    local e = { name = name, cat = category, rank = rank, cost = GetTrainerServiceCost(i) or 0,
+    local costs = { GetTrainerServiceCost(i) }
+    local e = { name = name, cat = category, rank = rank, cost = tonumber(costs[1]) or 0,
                 lvl = tonumber(GetTrainerServiceLevelReq(i)) }
+    if #dump.raw < 6 then
+      local parts = {}
+      for k = 1, math.max(#costs, 1) do parts[k] = tostring(costs[k]) end
+      dump.raw[#dump.raw + 1] = ("cost returns for %s: %s"):format(tostring(name), table.concat(parts, ", "))
+    end
     -- does the game say you are missing the previous rank of this same skill?
     if hasReqAPI and name then
       for r = 1, GetTrainerServiceNumAbilityReq(i) or 0 do
@@ -560,7 +566,13 @@ local function ScanTrainer()
     d.profs[which] = { costs = byLevel, at = time() }
     d.prof, d.profAt = nil, time()
   elseif kind == "pet" then
-    d.pet, d.petAt = byLevel, time()
+    -- Pet skills cost silver to learn. Prices of a few copper mean the game gave us
+    -- something else (training points), so plan nothing rather than plan wrong.
+    if ns.PetPricesSuspect(byLevel) then
+      d.pet, d.petAt, d.petSuspect = {}, time(), true
+    else
+      d.pet, d.petAt, d.petSuspect = byLevel, time(), nil
+    end
   elseif kind == "weapon" then
     -- weapon skills are optional one-off purchases: recorded, never planned
     local skills = {}
@@ -585,6 +597,20 @@ local function ScanTrainer()
   ns.Log("trainer scan (%s): %d services, %d future costs", kind, n, count)
   ns.Fire("JPMF_GOALS_CHANGED")
 end
+function ns.PetPricesSuspect(costs)
+  local any, top = false, 0
+  for _, c in pairs(costs or {}) do
+    if c > 0 then any = true; top = math.max(top, c) end
+  end
+  return any and top < 100
+end
+
+-- Pet plans saved by 1.2.3 and earlier may hold those copper "prices"; clear them.
+ns.On("PLAYER_LOGIN", function()
+  local d = ns.char and ns.char.debits
+  if d and ns.PetPricesSuspect(d.pet) then d.pet, d.petSuspect = {}, true end
+end)
+
 -- 1.2.1 and earlier filed a weapon master's list as class training, replacing the
 -- real plan. If this character's class plan came from one, move it aside so the
 -- next class trainer visit plans properly.
