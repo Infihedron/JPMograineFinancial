@@ -253,7 +253,8 @@ function ns.Report()
   end
   add("Class trainer scan: %s / %s", d.scannedAt and date("%m-%d %H:%M", d.scannedAt) or "never", Levels(d.class))
   add("Pet trainer scan: %s / %s", d.petAt and date("%m-%d %H:%M", d.petAt) or "never", Levels(d.pet))
-  if d.petSuspect then add("  Pet prices read as a few copper, so pet training is not planned. The cost returns below show what the game sent.") end
+  local bt = ns.acct.trainerDumps and ns.acct.trainerDumps.beast
+  if bt then add("Beast Training (training points, never planned): last opened %s", bt.t and date("%m-%d %H:%M", bt.t) or "?") end
   local rid = {}
   for name, cost in pairs(d.riding or {}) do rid[#rid + 1] = name .. "=" .. ns.Money(cost) end
   table.sort(rid)

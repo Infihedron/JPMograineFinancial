@@ -10,7 +10,9 @@ local _date = os.date
 function date(f, t) return _date(f, t or NOW_T) end
 MONEY = 371240
 function GetMoney() return MONEY end
-function UnitName() return "Valindra" end
+NPC_NAME = "Trainer"
+function UnitName(u) if u == "npc" then return NPC_NAME end return "Valindra" end
+function UnitExists(u) if u == "npc" then return NPC_NAME ~= nil end return true end
 LEVEL = 32
 function UnitLevel() return LEVEL end
 function UnitClass() return "Hunter", "HUNTER" end

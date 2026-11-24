@@ -374,6 +374,9 @@ end
 -- Only a trainer that is plainly your class's own can change your class plan;
 -- anything unrecognized is recorded but plans nothing.
 function ns.TrainerKind()
+  -- Beast Training (your pet's skills, paid in training points) opens in the same
+  -- window as a trainer but has no NPC behind it. It costs no gold: never plan it.
+  if UnitExists and not UnitExists("npc") then return "beast" end
   local n = GetNumTrainerServices and GetNumTrainerServices() or 0
   local names = {}
   for i = 1, n do
@@ -422,6 +425,11 @@ end
 local scanning, lastScan = false, 0
 local function ScanTrainer()
   if scanning or not GetNumTrainerServices or not GetTrainerServiceLevelReq then return end
+  if UnitExists and not UnitExists("npc") then
+    -- Beast Training: training points, not gold. Note it and leave every plan alone.
+    ns.acct.trainerDumps.beast = { t = time(), n = GetNumTrainerServices() or 0 }
+    return
+  end
   scanning = true
   local restore = nil   -- the value that puts the filter back, if we changed it
   if GetTrainerServiceTypeFilter and SetTrainerServiceTypeFilter then
@@ -566,13 +574,7 @@ local function ScanTrainer()
     d.profs[which] = { costs = byLevel, at = time() }
     d.prof, d.profAt = nil, time()
   elseif kind == "pet" then
-    -- Pet skills cost silver to learn. Prices of a few copper mean the game gave us
-    -- something else (training points), so plan nothing rather than plan wrong.
-    if ns.PetPricesSuspect(byLevel) then
-      d.pet, d.petAt, d.petSuspect = {}, time(), true
-    else
-      d.pet, d.petAt, d.petSuspect = byLevel, time(), nil
-    end
+    d.pet, d.petAt, d.petSuspect = byLevel, time(), nil
   elseif kind == "weapon" then
     -- weapon skills are optional one-off purchases: recorded, never planned
     local skills = {}
@@ -605,10 +607,15 @@ function ns.PetPricesSuspect(costs)
   return any and top < 100
 end
 
--- Pet plans saved by 1.2.3 and earlier may hold those copper "prices"; clear them.
+-- 1.2.3 and earlier read Beast Training's training point costs as pet trainer
+-- prices. Clear any pet plan that came from it.
 ns.On("PLAYER_LOGIN", function()
-  local d = ns.char and ns.char.debits
-  if d and ns.PetPricesSuspect(d.pet) then d.pet, d.petSuspect = {}, true end
+  local d, dumps = ns.char and ns.char.debits, ns.acct.trainerDumps
+  local fromBeast = dumps and dumps.pet and dumps.pet.npc == "?"
+  if d and (fromBeast or ns.PetPricesSuspect(d.pet)) then
+    d.pet, d.petAt, d.petSuspect = {}, nil, nil
+    if fromBeast then dumps.beast, dumps.pet = dumps.pet, nil end
+  end
 end)
 
 -- 1.2.1 and earlier filed a weapon master's list as class training, replacing the

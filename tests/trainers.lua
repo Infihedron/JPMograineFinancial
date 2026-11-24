@@ -33,9 +33,14 @@ k = visit("Riding Trainer", { {"Apprentice Riding","unavailable",900000,40,nil,"
 assert(k == "riding" and d.class[40] == 50000)
 k = visit("Pet Trainer", { {"Great Stamina","unavailable",25,36,nil,"Rank 6"} })
 assert(k == "pet" and d.class[38] == 32000)
-assert(d.petSuspect and next(d.pet) == nil, "copper pet prices are not planned")
 k = visit("Pet Trainer", { {"Great Stamina","unavailable",4500,40,nil,"Rank 6"} })
-assert(d.pet[40] == 4500 and not d.petSuspect, "real pet prices are planned")
+assert(d.pet[40] == 4500, "real pet trainer prices are planned")
+-- Beast Training: no NPC, training point costs; changes nothing
+NPC_NAME = nil
+k = visit(nil, { {"Cower","available",12,25,nil,"Rank 3"}, {"Natural Armor","available",25,36,nil,"Rank 6"} })
+NPC_NAME = "Trainer"
+assert(k == "beast" and d.pet[40] == 4500 and d.pet[36] == nil and d.class[38] == 32000, "beast training ignored")
+print("beast training window ignored")
 print("weapon, portal, other class, riding and pet trainers left the class plan alone")
 
 -- professions are kept apart
