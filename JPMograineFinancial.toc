@@ -2,7 +2,7 @@
 ## Title: |cffe9c86aJP Mograine Financial|r
 ## Notes: Private banking for adventurers: savings accounts, gold forecasts and a weekly review from your advisor, Morgrim Stanley.
 ## Author: Infihedron
-## Version: 1.2.4
+## Version: 1.2.5
 ## X-Copyright: Copyright (C) 2026 Infihedron
 ## X-License: GPL-3.0-or-later
 ## X-Website: https://github.com/Infihedron/JPMograineFinancial

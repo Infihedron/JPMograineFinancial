@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.5 (2026-11-25)
+
+- Accounts can no longer claim gold you have already spent. When you spend more than Free, the difference now comes out of your accounts automatically, lowest priority first (the bottom of your list), and each account's history notes it. Before, accounts kept their balances and Free went negative, so a 44g mount fund could sit on top of 25g of real gold.
+- This is now on for everyone, including existing characters, and it also tidies up at login. If you would rather see the overdraft and decide yourself, turn it off in Settings; the Accounts page then shows a Cover it button whenever you are overdrawn.
+- Tip: put the accounts you care about most at the top. Up and Down set the order an overdraft is covered in.
+
 ## 1.2.4 (2026-11-24)
 
 - Fixed: the training reserve could target a few copper ("Train now, funded at 62c") and Upcoming costs showed "Due now 62c". Hunters' Beast Training window opens like a trainer, and its training point costs were read as pet trainer prices in copper. Beast Training is now ignored entirely: it costs no gold, so it is never planned. The bad saved values are cleared at login, and your reserve saves for your next class training. Pet trainers (the NPCs who sell new ranks for gold) are still planned.

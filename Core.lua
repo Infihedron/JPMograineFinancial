@@ -13,8 +13,8 @@
      Core: saved data, events, error capture, debug log, slash commands, diagnostics. ]]
 
 local ADDON, ns = ...
-ns.VERSION = "1.2.4"
-ns.SCHEMA = 4
+ns.VERSION = "1.2.5"
+ns.SCHEMA = 5
 ns.NAME = "JP Mograine Financial"
 ns.GOLD_HEX = "e9c86a"
 
@@ -78,7 +78,7 @@ end
 ---------------------------------------------------------------------------
 local ACCOUNT_DEFAULTS = {
   settings = {
-    rawDays = 14, debug = false, autoPlan = true, includeProfTraining = false, includePetTraining = true, overdraft = "hold", pace = "level",
+    rawDays = 14, debug = false, autoPlan = true, includeProfTraining = false, includePetTraining = true, overdraft = "pull", pace = "level",
     minimap = { angle = 215, hide = false }, morgrimCreature = 8256,   -- Curator Thorius, Ironforge
     rateOverride = nil, hplOverride = nil,
   },
@@ -131,6 +131,10 @@ local MIGRATIONS = {
       if g.kind == "riding40" and g.target == 1000000 then g.target = 900000 end
       if g.kind == "riding60" and g.target == 10000000 then g.target = 9000000 end
     end
+  end,
+  -- 5: accounts now cover an overdraft by default, so they never claim gold you have spent
+  [5] = function(db)
+    if db.settings and db.settings.overdraft == "hold" then db.settings.overdraft = "pull" end
   end,
 }
 

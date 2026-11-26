@@ -405,6 +405,9 @@ ns.RegisterPage("Accounts", function(page, f)
   local sum = Card(f, 918, 40); sum:SetPoint("TOPLEFT", 0, -26)
   sum.text = UI.Text(sum, 12, C.text, UI.NUM); sum.text:SetPoint("LEFT", 12, 0); sum.text:SetWidth(640)
   sum.seg = UI.SegBar(sum, 240, 12); sum.seg:SetPoint("RIGHT", sum, "RIGHT", -12, 0)
+  -- only shown when overdrawn and automatic covering is off
+  sum.cover = UI.Button(sum, "Cover it", 76, 22, function() ns.CoverOverdraft() end)
+  sum.cover:SetPoint("RIGHT", sum.seg, "LEFT", -10, 0)
 
   local function Selected() return ns.FindAccount(page.pick) end
   Popup("JPMF_SET_TARGET", "Target for this account (for example 90g or 12g 50s). Leave empty for no target:", function(id, text)
@@ -501,6 +504,8 @@ ns.RegisterPage("Accounts", function(page, f)
       ns.Money(GetMoney(), true), ns.Money(held, true),
       free < 0 and ("|cfff08b80Overdrawn %s|r"):format(ns.Money(-free)) or ("Free %s"):format(ns.Money(free, true)),
       ns.Money((ns.Assets()), true)))
+    sum.cover:SetShown(free < 0)
+    sum.text:SetWidth(free < 0 and 560 or 640)
     local saved = ns.Balances()
     local pts = ns.Forecast(15)
     local list = ns.char.goals
@@ -1102,7 +1107,7 @@ ns.RegisterPage("Settings", function(page, f)
       function(v) s().includeProfTraining = v; ns.Fire("JPMF_GOALS_CHANGED") end },
     { "Include pet trainer skills in the forecast", function() return s().includePetTraining ~= false end,
       function(v) s().includePetTraining = v; ns.Fire("JPMF_GOALS_CHANGED") end },
-    { "When overdrawn, cover it from my lowest-priority accounts", function() return s().overdraft == "pull" end,
+    { "When I spend more than Free, take it from my lowest-priority accounts", function() return s().overdraft == "pull" end,
       function(v) s().overdraft = v and "pull" or "hold"; ns.Fire("JPMF_GOALS_CHANGED") end },
     { "Debug log (for bug reports)", function() return s().debug end, function(v) s().debug = v end },
   }

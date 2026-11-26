@@ -254,22 +254,41 @@ ns.On("JPMF_LEDGER_CHANGED", function(_, amount, cat)
       end
     end
   end
-  local free = ns.Free()
-  if free < 0 and ns.acct.settings.overdraft == "pull" then
-    local list = ns.char.goals
-    for i = #list, 1, -1 do
-      if free >= 0 then break end
-      local g = list[i]
-      local take = min(g.balance or 0, -free)
-      if take > 0 then
-        g.balance = g.balance - take
-        free = free + take
-        Note(g, -take, "covered an overdraft")
-        changed = true
-      end
+  if ns.acct.settings.overdraft == "pull" and ns.CoverOverdraft(true) > 0 then changed = true end
+  if changed then ns.Fire("JPMF_GOALS_CHANGED") end
+end)
+
+-- Accounts can only hold gold you actually have. When spending leaves Free below
+-- zero, take the difference back out of the accounts, lowest priority first, and
+-- note it in each account's history. Returns how much was moved.
+function ns.CoverOverdraft(quiet)
+  if not ns.char then return 0 end
+  local free, moved = ns.Free(), 0
+  local list = ns.char.goals
+  for i = #list, 1, -1 do
+    if free >= 0 then break end
+    local g = list[i]
+    local take = min(g.balance or 0, -free)
+    if take > 0 then
+      g.balance = g.balance - take
+      free, moved = free + take, moved + take
+      Note(g, -take, "covered an overdraft")
     end
   end
-  if changed then ns.Fire("JPMF_GOALS_CHANGED") end
+  if moved > 0 and not quiet then
+    ns.Say(("Covered an overdraft of %s from your accounts, lowest priority first."):format(ns.Money(moved)))
+    ns.Fire("JPMF_GOALS_CHANGED")
+  end
+  return moved
+end
+
+-- Gold can change while you are logged out (mail, another addon, a server fix):
+-- tidy up at login too.
+ns.On("PLAYER_LOGIN", function()
+  local run = function()
+    if ns.char and ns.acct.settings.overdraft == "pull" and ns.CoverOverdraft(true) > 0 then ns.Fire("JPMF_GOALS_CHANGED") end
+  end
+  if C_Timer then C_Timer.After(5, function() ns.Safe(run) end) else ns.Safe(run) end
 end)
 
 -- 1.0 goals had no balances: give each the share the old top-down fill gave it,

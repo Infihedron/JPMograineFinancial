@@ -29,7 +29,7 @@ ADV(5); FIRE("CHAT_MSG_MONEY"); money(10 * G); show("loot 10g (riding +2g, savin
 FIRE("PLAYER_LOGOUT"); ns.Record(5 * G, "Unreconciled", "test"); MONEY = MONEY + 5 * G; JPMF_CharDB.gold = MONEY
 show("unreconciled +5g, no rule deposits")
 FIRE("TRAINER_SHOW"); money(-3 * G); FIRE("TRAINER_CLOSED"); show("paid 3g class training from training reserve")
-ADV(5); FIRE("MERCHANT_SHOW"); money(-20 * G); FIRE("MERCHANT_CLOSED"); show("spent 20g at a vendor (hold mode)")
+ns.acct.settings.overdraft = "hold"; ADV(5); FIRE("MERCHANT_SHOW"); money(-20 * G); FIRE("MERCHANT_CLOSED"); show("spent 20g at a vendor (hold mode)")
 ns.acct.settings.overdraft = "pull"; ADV(5); FIRE("MERCHANT_SHOW"); money(-1); FIRE("MERCHANT_CLOSED"); show("pull mode covers it")
 print("auto deposits week", ns.Money((ns.AutoDeposits(7))))
 for _, l in ipairs(ns.MorgrimLines()) do print("M:", l) end
@@ -38,3 +38,16 @@ for _, p in ipairs(ns.UI.pageOrder) do ns.ShowPage(p.name) end
 print(ns.StatementText():match("ACCOUNTS.-\n\n"))
 print("errors", #JPMF_DB.errors)
 for _, e in ipairs(JPMF_DB.errors) do print(e.msg) end
+
+-- 1.2.5: covering by hand, and the default for new and migrated settings
+ns.acct.settings.overdraft = "hold"
+ADV(5); FIRE("MERCHANT_SHOW"); money(-5 * G); FIRE("MERCHANT_CLOSED")
+assert(ns.Free() < 0, "hold mode leaves it overdrawn")
+local moved = ns.CoverOverdraft()
+assert(moved > 0 and ns.Free() == 0, "Cover it brings Free back to zero")
+local total = 0
+for _, g in ipairs(JPMF_CharDB.goals) do total = total + (g.balance or 0) end
+assert(total == GetMoney(), "accounts hold exactly the gold you have")
+print("cover by hand: moved", ns.Money(moved), "| accounts now hold", ns.Money(total), "of", ns.Money(GetMoney()))
+ns.ToggleMain(); ns.ShowPage("Accounts")
+print("errors", #JPMF_DB.errors); for _, e in ipairs(JPMF_DB.errors) do print(e.msg) end
